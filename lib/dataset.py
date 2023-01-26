@@ -159,8 +159,6 @@ class CityScapes(data.Dataset):
         disparity = torch.from_numpy(self.map_disparity(disparity)).unsqueeze(0).float()
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)), dtype=float)
         seg = torch.from_numpy(self.map_seg_label(seg)).long()
-        instance_seg = np.array(Image.open(self.data_path + '/instance_seg/{:d}.png'.format(index)), dtype=float)
-        instance_seg = torch.from_numpy(self.map_instance_label(seg)).long()
         part_seg = np.array(Image.open(self.data_path + '/part_seg/{:d}.tif'.format(index)))
         part_seg = torch.from_numpy(self.map_part_seg_label(part_seg)).long()
 
