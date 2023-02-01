@@ -1,13 +1,12 @@
+import timm
 import torch 
-import torch.nn as nn 
-import timm
-
-import timm
 import torch.nn as nn
+
 from effdet.efficientdet import BiFpn
 from effdet.config import fpn_config
 
 from omegaconf import DictConfig
+from lib.model.heads import BiFPNDecoder
 
 class StandaloneConfig:
     image_size: tuple = (224, 224)
