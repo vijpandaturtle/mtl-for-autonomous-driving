@@ -1,6 +1,6 @@
 import torch 
 import torch.nn as nn 
-
+from lib.model.blocks import SegmentationBlock, MergeBlock
 
 class BiFPNDecoder(nn.Module):
     def __init__(
