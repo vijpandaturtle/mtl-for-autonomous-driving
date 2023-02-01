@@ -6,7 +6,7 @@ from effdet.efficientdet import BiFpn
 from effdet.config import fpn_config
 
 from omegaconf import DictConfig
-from lib.model.heads import BiFPNDecoder
+from lib.model.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
 class StandaloneConfig:
     image_size: tuple = (224, 224)
@@ -46,7 +46,7 @@ class DenseMultiNet(nn.Module):
         
         self.segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1 if self.seg_mode == BINARY_MODE else self.seg_classes+1,
+            out_channels=19, #Semantic Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -54,7 +54,7 @@ class DenseMultiNet(nn.Module):
 
         self.part_segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1 if self.seg_mode == BINARY_MODE else self.seg_classes+1,
+            out_channels=1, #Part Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -62,7 +62,7 @@ class DenseMultiNet(nn.Module):
 
         self.depth_estimation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1 if self.seg_mode == BINARY_MODE else self.seg_classes+1,
+            out_channels=1, #Depth Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
