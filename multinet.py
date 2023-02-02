@@ -39,7 +39,7 @@ class DenseMultiNet(nn.Module):
     def __init__(self, config, backbone='convnext_atto', backbone_indices=(1, 2, 3)):
         super().__init__()
         
-        self.backbone = timm.create_model(backbone, features_only=True, out_indices=backbone_indices, pretrained=True)
+        self.backbone = timm.create_model('convnext_atto', features_only=True, out_indices=backbone_indices, pretrained=True)
         self.neck = BiFpn(config, self.backbone.feature_info.get_dicts())
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=88)
        
@@ -71,7 +71,7 @@ class DenseMultiNet(nn.Module):
     def forward(self, x):
         x = self.backbone(x)
         x = self.neck(x)
-        p2, p3, p4, p5 = self.encoder(inputs)[-4:]  # self.backbone_net(inputs)
+        p2, p3, p4, p5 = self.backbone(x)[-4:]
 
         features = (p3, p4, p5)
 
@@ -84,9 +84,10 @@ class DenseMultiNet(nn.Module):
         semantic_seg_map = self.segmentation_head(outputs)
         part_seg_map = self.part_segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
-
+        
         return semantic_seg_map, part_seg_map, depth_map
 
 sc = StandaloneConfig()
-data = torch.randn((3, 224, 224))
-output1, output2, output3 = DenseMultiNet(sc, data)
+data = torch.randn((1, 3, 224, 224))
+model = DenseMultiNet(sc)
+out1, out2, out3 = model(data)
