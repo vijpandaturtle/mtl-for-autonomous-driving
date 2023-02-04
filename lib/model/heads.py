@@ -17,7 +17,7 @@ class BiFPNDecoder(nn.Module):
             for n_upsamples in [5,4, 3, 2, 1]
         ])
         
-        self.seg_p2 = SegmentationBlock(32, 64, n_upsamples=0)
+        self.seg_p2 = SegmentationBlock(40, 64, n_upsamples=0)
         self.merge = MergeBlock(merge_policy)
         self.dropout = nn.Dropout2d(p=dropout, inplace=True)
 
