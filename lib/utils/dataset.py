@@ -100,6 +100,9 @@ class CityScapes(data.Dataset):
 
         # calculate data length
         self.data_len = len(fnmatch.filter(os.listdir(self.data_path + '/image'), '*.png'))
+    
+    def __len__(self):
+        return self.data_len
 
     def map_seg_label(self, mask):
         # source: https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
@@ -125,6 +128,10 @@ class CityScapes(data.Dataset):
         mask_map[np.isin(mask, [32])] = 17
         mask_map[np.isin(mask, [33])] = 18
         return mask_map
+    
+    #def map_instance_seg_label(self, mask):
+
+        
 
     def map_part_seg_label(self, mask):
         # https://panoptic-parts.readthedocs.io/en/stable/api_and_code.html
@@ -149,9 +156,6 @@ class CityScapes(data.Dataset):
         disparity[disparity > -1] = (disparity[disparity > -1] - 1) / (256 * 4)
         return disparity
     
-    def __len__(self):
-        return self.data_len
-
     def __getitem__(self, index):
         # load data from the pre-processed npy files
         image = torch.from_numpy(np.moveaxis(plt.imread(self.data_path + '/image/{:d}.png'.format(index)), -1, 0)).float()
@@ -170,6 +174,8 @@ class CityScapes(data.Dataset):
 
         im = 2. * data_dict.pop('im') - 1.  # normalised to [-1, 1]
         return im, data_dict
+    
+    
 
     
    

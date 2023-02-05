@@ -49,13 +49,13 @@ class DenseMultiNet(nn.Module):
             upsampling=4,
         )
 
-        self.instance_segmentation_head = SegmentationHead(
-            in_channels=64,
-            out_channels=1, #Instance Classes
-            activation=None,
-            kernel_size=1,
-            upsampling=4,
-        )
+        # self.instance_segmentation_head = SegmentationHead(
+        #     in_channels=64,
+        #     out_channels=1, #Instance Classes
+        #     activation=None,
+        #     kernel_size=1,
+        #     upsampling=4,
+        # )
 
     def forward(self, x):
         p2, p3, p4, p5 = self.backbone(x)[-4:]
