@@ -25,7 +25,6 @@ class DenseMultiNet(nn.Module):
 
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
-        
         self.segmentation_head = SegmentationHead(
             in_channels=64,
             out_channels=19, #Semantic Segmentation Classes
@@ -49,7 +48,15 @@ class DenseMultiNet(nn.Module):
             kernel_size=1,
             upsampling=4,
         )
-        
+
+        self.instance_segmentation_head = SegmentationHead(
+            in_channels=64,
+            out_channels=1, #Instance Classes
+            activation=None,
+            kernel_size=1,
+            upsampling=4,
+        )
+
     def forward(self, x):
         p2, p3, p4, p5 = self.backbone(x)[-4:]
        
@@ -64,7 +71,7 @@ class DenseMultiNet(nn.Module):
         part_seg_map = self.part_segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
         
-        return semantic_seg_map, part_seg_map, depth_map
+        return instance_maps, semantic_seg_map, part_seg_map, depth_map
 
 data = torch.randn((1, 3, 512, 256))
 model = DenseMultiNet()
