@@ -63,20 +63,20 @@ class InvHuberLoss(nn.Module):
         cost = torch.mean(err * mask_err.float() + err2 * mask_err2.float())
         return cost    
 
-# def compute_loss(pred, gt, task_id):
-#     """
-#     Compute task-specific loss.
-#     """
-#     if task_id in ['seg', 'part_seg'] or 'class' in task_id:
-#         # Cross Entropy Loss with Ignored Index (values are -1)
-#         loss = F.cross_entropy(pred, gt, ignore_index=-1)
+def compute_loss(pred, gt, task_id):
+    """
+    Compute task-specific loss.
+    """
+    if task_id in ['seg', 'instance_seg', 'part_seg'] or 'class' in task_id:
+        # Cross Entropy Loss with Ignored Index (values are -1)
+        loss = F.cross_entropy(pred, gt, ignore_index=-1)
 
-#     if task_id in ['normal', 'depth', 'disp', 'noise']:
-#         # L1 Loss with Ignored Region (values are 0 or -1)
-#         invalid_idx = -1 if task_id == 'disp' else 0
-#         valid_mask = (torch.sum(gt, dim=1, keepdim=True) != invalid_idx).to(pred.device)
-#         loss = torch.sum(F.l1_loss(pred, gt, reduction='none').masked_select(valid_mask)) \
-#                 / torch.nonzero(valid_mask, as_tuple=False).size(0)
-#     return loss
+    if task_id in ['depth', 'disp']:
+        # L1 Loss with Ignored Region (values are 0 or -1)
+        invalid_idx = -1 if task_id == 'disp' else 0
+        valid_mask = (torch.sum(gt, dim=1, keepdim=True) != invalid_idx).to(pred.device)
+        loss = torch.sum(F.l1_loss(pred, gt, reduction='none').masked_select(valid_mask)) \
+                / torch.nonzero(valid_mask, as_tuple=False).size(0)
+    return loss
 
 
