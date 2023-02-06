@@ -144,7 +144,7 @@ for city in train_label_list:
     for l in label_list:
         im = Image.open(l)
         im = im.resize((512, 256), resample=Image.NEAREST)
-        im.save(part_train_root + '{}.tif'.format(counter))
+        im.save(part_train_root + '/{}.tif'.format(counter))
         counter += 1
 print('Training Label images processing has completed.')
 
