@@ -8,6 +8,8 @@ im_train_root = root + '/cityscapes/train/images'
 im_val_root = root + '/cityscapes/val/images'
 label_train_root = root + '/cityscapes/train/seg'
 label_val_root = root + '/cityscapes/val/seg'
+ins_train_root = root + '/cityscapes/train/instance_seg'
+ins_val_root = root + '/cityscapes/val/instance_seg'
 part_train_root = root + '/cityscapes/train/part_seg'
 part_val_root = root + '/cityscapes/val/part_seg'
 depth_train_root = root + '/cityscapes/train/depth'
@@ -17,6 +19,8 @@ os.makedirs(im_train_root)
 os.makedirs(im_val_root)
 os.makedirs(label_train_root)
 os.makedirs(label_val_root)
+os.makedirs(ins_train_root)
+os.makedirs(ins_val_root)
 os.makedirs(part_train_root)
 os.makedirs(part_val_root)
 os.makedirs(depth_train_root)
@@ -76,6 +80,7 @@ for city in val_im_list:
         counter += 1
 print('Validation depth images processing has completed.')
 
+
 # Segmentation
 counter = 0
 train_label_list = glob.glob(root + '/gtFine_trainvaltest/gtFine/train/*')
@@ -101,6 +106,34 @@ for city in val_label_list:
         im.save(label_val_root + '/{}.png'.format(counter))
         counter += 1
 print('Validation Label images processing has completed.')
+
+
+# Instance Segmentation
+counter = 0
+train_label_list = glob.glob(root + '/gtFine_trainvaltest/gtFine/train/*')
+for city in train_label_list:
+    label_list = glob.glob(city + '/*_instanceIds.png')
+    label_list.sort()
+    for l in label_list:
+        im = Image.open(l)
+        im = im.resize((512, 256), resample=Image.NEAREST)
+        im.save(ins_train_root + '/{}.png'.format(counter))
+        counter += 1
+print('Training Label images processing has completed.')
+
+
+counter = 0
+val_label_list = glob.glob(root + '/gtFine_trainvaltest/gtFine/val/*')
+for city in val_label_list:
+    label_list = glob.glob(city + '/*_instanceIds.png')
+    label_list.sort()
+    for l in label_list:
+        im = Image.open(l)
+        im = im.resize((512, 256), resample=Image.NEAREST)
+        im.save(ins_val_root + '/{}.png'.format(counter))
+        counter += 1
+print('Validation Label images processing has completed.')
+
 
 # Part Segmentation
 counter = 0
