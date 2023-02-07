@@ -56,7 +56,7 @@ class DenseDrive(nn.Module):
         
         return semantic_seg_map, depth_map
 
-     def initialize_decoder(self, module):
+    def initialize_decoder(self, module):
         for m in module.modules():
 
             if isinstance(m, nn.Conv2d):
@@ -80,7 +80,3 @@ class DenseDrive(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-
-data = torch.randn((1, 3, 512, 256))
-model = DenseDrive()
-out1, out2, out3, out4 = model(data)

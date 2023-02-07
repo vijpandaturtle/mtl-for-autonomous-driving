@@ -1,234 +1,183 @@
-import argparse
-import datetime
-import os
-import traceback
-
-import numpy as np
 import torch
-from tensorboardX import SummaryWriter
-from torch import nn
-from torchvision import transforms
-from tqdm.autonotebook import tqdm
-
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data.dataset import Dataset
+import torch.utils.data.sampler as sampler
+from lib.model.multinet import DenseDrive
 from lib.utils.dataset import CityScapes
 
+import os
+import fnmatch
+import numpy as np
+import random
+import matplotlib.pyplot as plt
 
-def get_args():
-    parser = argparse.ArgumentParser('DenseDrive')
-    parser.add_argument('-n', '--num_workers', type=int, default=8, help='Num_workers of dataloader')
-    parser.add_argument('-b', '--batch_size', type=int, default=12, help='Number of images per batch among all devices')
-    parser.add_argument('--freeze_backbone', type=boolean_string, default=False,
-                        help='Freeze encoder and neck (effnet and bifpn)')
-    parser.add_argument('--freeze_seg', type=boolean_string, default=False,
-                        help='Freeze segmentation head')
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--optim', type=str, default='adamw', help='Select optimizer for training, '
-                                                                   'suggest using \'adamw\' until the'
-                                                                   ' very final stage then switch to \'sgd\'')
-    parser.add_argument('--num_epochs', type=int, default=500)
-    parser.add_argument('--val_interval', type=int, default=1, help='Number of epoches between valing phases')
-    parser.add_argument('--save_interval', type=int, default=500, help='Number of steps between saving')
-    parser.add_argument('--es_min_delta', type=float, default=0.0,
-                        help='Early stopping\'s parameter: minimum change loss to qualify as an improvement')
-    parser.add_argument('--es_patience', type=int, default=0,
-                        help='Early stopping\'s parameter: number of epochs with no improvement after which '
-                             'training will be stopped. Set to 0 to disable this technique')
-    parser.add_argument('--data_path', type=str, default='datasets/', help='The root folder of dataset')
-    parser.add_argument('-w', '--load_weights', type=str, default=None,
-                        help='Whether to load weights from a checkpoint, set None to initialize,'
-                             'set \'last\' to load last checkpoint')
-    parser.add_argument('--debug', type=boolean_string, default=False,
-                        help='Whether visualize the predicted boxes of training, '
-                             'the output images will be in test/, '
-                             'and also only use first 500 images.')
-    parser.add_argument('--cal_map', type=boolean_string, default=True,
-                        help='Calculate mAP in validation')
-    parser.add_argument('-v', '--verbose', type=boolean_string, default=True,
-                        help='Whether to print results per class when valing')
-    parser.add_argument('--plots', type=boolean_string, default=True,
-                        help='Whether to plot confusion matrix when valing')
-    parser.add_argument('--num_gpus', type=int, default=1,
-                        help='Number of GPUs to be used (0 to use CPU)')
-    parser.add_argument('--conf_thres', type=float, default=0.001,
-                        help='Confidence threshold in NMS')
-    parser.add_argument('--iou_thres', type=float, default=0.6,
-                        help='IoU threshold in NMS')
-    parser.add_argument('--amp', type=boolean_string, default=False,
-                        help='Automatic Mixed Precision training')
-
-    args = parser.parse_args()
-    return args
-
-def train(opt):
-    torch.backends.cudnn.benchmark = True
-    print("\nCUDNN VERSION: {}\n".format(torch.backends.cudnn.version()))
-
-    if opt.num_gpus == 0:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
-    else:
-        torch.manual_seed(42)
-
-    train_dataset = CityScapes(root=dataset_path, train=True, augmentation=True)
-    valid_dataset = CityScapes(root=dataset_path, train=False)
-
-    training_generator = DataLoaderX(
-        train_dataset,
-        batch_size=opt.batch_size,
-        shuffle=False,
-        num_workers=opt.num_workers,
-        pin_memory=params.pin_memory,
-        collate_fn=BddDataset.collate_fn
-    )
-
-    val_generator = DataLoaderX(
-        valid_dataset,
-        batch_size=opt.batch_size,
-        shuffle=False,
-        num_workers=opt.num_workers,
-        pin_memory=params.pin_memory,
-        collate_fn=BddDataset.collate_fn
-    )
+def model_fit(x_pred, x_output, task_type):
+    device = x_pred.device
+    # binary mark to mask out undefined pixel space
+    binary_mask = (torch.sum(x_output, dim=1) != 0).float().unsqueeze(1).to(device)
+    if task_type == 'semantic':
+        # semantic loss: depth-wise cross entropy
+        loss = F.nll_loss(x_pred, x_output, ignore_index=-1)
+    if task_type == 'depth':
+        # depth loss: l1 norm
+        loss = torch.sum(torch.abs(x_pred - x_output) * binary_mask) / torch.nonzero(binary_mask, as_tuple=False).size(0)
+    return loss
 
 
-    model = DenseDrive()
-    # load last weights
-    ckpt = {}
-    # last_step = None
-    if opt.load_weights:
-        if opt.load_weights.endswith('.pth'):
-            weights_path = opt.load_weights
-        else:
-            weights_path = get_last_weights(opt.saved_path)
+# mIoU and Acc. formula: accumulate every pixel and average across all pixels in all images
+class ConfMatrix(object):
+    def __init__(self, num_classes):
+        self.num_classes = num_classes
+        self.mat = None
 
-        try:
-            ckpt = torch.load(weights_path)
-            # new_weight = OrderedDict((k[6:], v) for k, v in ckpt['model'].items())
-            model.load_state_dict(ckpt.get('model', ckpt), strict=False)
-        except RuntimeError as e:
-            print(f'[Warning] Ignoring {e}')
-            print(
-                '[Warning] Don\'t panic if you see this, this might be because you load a pretrained weights with different number of classes. The rest of the weights should be loaded already.')
-    else:
-        print('[Info] initializing weights...')
-        init_weights(model)
+    def update(self, pred, target):
+        n = self.num_classes
+        if self.mat is None:
+            self.mat = torch.zeros((n, n), dtype=torch.int64, device=pred.device)
+        with torch.no_grad():
+            k = (target >= 0) & (target < n)
+            inds = n * target[k].to(torch.int64) + pred[k]
+            self.mat += torch.bincount(inds, minlength=n ** 2).reshape(n, n)
 
-    print('[Info] Successfully!!!')
-
-    if opt.freeze_backbone:
-        model.encoder.requires_grad_(False)
-        model.bifpn.requires_grad_(False)
-        print('[Info] freezed backbone')
-
-    if opt.freeze_seg:
-        model.bifpndecoder.requires_grad_(False)
-        model.segmentation_head.requires_grad_(False)
-        model.part_segmentation_head.requires_grad_(False)
-        model.depth_estimation_head.requires_grad_(False)
-        print('[Info] freezed segmentation head')
-
-    writer = SummaryWriter(opt.log_path + f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}/')
-
-    # wrap the model with loss function, to reduce the memory usage on gpu0 and speedup
-    model = ModelWithLoss(model, debug=opt.debug)
-    model = model.to(memory_format=torch.channels_last)
-
-    if opt.num_gpus > 0:
-        model = model.cuda()
-
-    if opt.optim == 'adamw':
-        optimizer = torch.optim.AdamW(model.parameters(), opt.lr)
-    else:
-        optimizer = torch.optim.SGD(model.parameters(), opt.lr, momentum=0.9, nesterov=True)
+    def get_metrics(self):
+        h = self.mat.float()
+        acc = torch.diag(h).sum() / h.sum()
+        iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
+        return torch.mean(iu), acc
     
-    scaler = torch.cuda.amp.GradScaler(enabled=opt.amp)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
 
-    epoch = 0
-    best_loss = 1e5
-    best_epoch = 0
-    last_step = ckpt['step'] if opt.load_weights is not None and ckpt.get('step', None) else 0
-    best_fitness = ckpt['best_fitness'] if opt.load_weights is not None and ckpt.get('best_fitness', None) else 0
-    step = max(0, last_step)
-    model.train()
-
-    num_iter_per_epoch = len(training_generator)
-    try:
-        for epoch in range(opt.num_epochs):
- 
-            epoch_loss = []
-            progress_bar = tqdm(training_generator, ascii=True)
-            for iter, data in enumerate(progress_bar):
-                try:
-                    imgs = data['img']
-                    annot = data['annot']
-                    seg_annot = data['segmentation']
-
-                    if opt.num_gpus == 1:
-                        # if only one gpu, just send it to cuda:0
-                        imgs = imgs.to(device="cuda", memory_format=torch.channels_last)
-                        annot = annot.cuda()
-                        seg_annot = seg_annot.cuda()
-
-                    optimizer.zero_grad(set_to_none=True)
-                    with torch.cuda.amp.autocast(enabled=opt.amp):
-                        cls_loss, reg_loss, seg_loss, regression, classification, anchors, segmentation = model(imgs, annot,
-                                                                                                                seg_annot,
-                                                                                                                obj_list=params.obj_list)
-                        cls_loss = cls_loss.mean() if not opt.freeze_det else torch.tensor(0, device="cuda")
-                        reg_loss = reg_loss.mean() if not opt.freeze_det else torch.tensor(0, device="cuda")
-                        seg_loss = seg_loss.mean() if not opt.freeze_seg else torch.tensor(0, device="cuda")
-
-                        loss = cls_loss + reg_loss + seg_loss
-                        
-                    if loss == 0 or not torch.isfinite(loss):
-                        continue
-
-                    scaler.scale(loss).backward()
-
-                    scaler.step(optimizer)
-                    scaler.update()
-
-                    epoch_loss.append(float(loss))
-
-                    progress_bar.set_description(
-                        'Step: {}. Epoch: {}/{}. Iteration: {}/{}. Cls loss: {:.5f}. Reg loss: {:.5f}. Seg loss: {:.5f}. Total loss: {:.5f}'.format(
-                            step, epoch, opt.num_epochs, iter + 1, num_iter_per_epoch, cls_loss.item(),
-                            reg_loss.item(), seg_loss.item(), loss.item()))
-                    writer.add_scalars('Loss', {'train': loss}, step)
-                    writer.add_scalars('Regression_loss', {'train': reg_loss}, step)
-                    writer.add_scalars('Classfication_loss', {'train': cls_loss}, step)
-                    writer.add_scalars('Segmentation_loss', {'train': seg_loss}, step)
-
-                    # log learning_rate
-                    current_lr = optimizer.param_groups[0]['lr']
-                    writer.add_scalar('learning_rate', current_lr, step)
-
-                    step += 1
-
-                    if step % opt.save_interval == 0 and step > 0:
-                        save_checkpoint(model, opt.saved_path, f'hybridnets-d{opt.compound_coef}_{epoch}_{step}.pth')
-                        print('checkpoint...')
-
-                except Exception as e:
-                    print('[Error]', traceback.format_exc())
-                    print(e)
-                    continue
-
-            scheduler.step(np.mean(epoch_loss))
-
-            if epoch % opt.val_interval == 0:
-                best_fitness, best_loss, best_epoch = val(model, val_generator, params, opt, seg_mode, is_training=True,
-                                                          optimizer=optimizer, scaler=scaler, writer=writer, epoch=epoch, step=step, 
-                                                          best_fitness=best_fitness, best_loss=best_loss, best_epoch=best_epoch)
-    except KeyboardInterrupt:
-        save_checkpoint(model, opt.saved_path, f'densedrive_{epoch}_{step}.pth')
-    finally:
-        writer.close()
+def depth_error(x_pred, x_output):
+    device = x_pred.device
+    binary_mask = (torch.sum(x_output, dim=1) != 0).unsqueeze(1).to(device)
+    x_pred_true = x_pred.masked_select(binary_mask)
+    x_output_true = x_output.masked_select(binary_mask)
+    abs_err = torch.abs(x_pred_true - x_output_true)
+    rel_err = torch.abs(x_pred_true - x_output_true) / x_output_true
+    return (torch.sum(abs_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item(), \
+           (torch.sum(rel_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item()
 
 
-if __name__ == '__main__':
-    opt = get_args()
-    train(opt)
+def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, config, total_epoch=200):
+    train_batch = len(train_loader)
+    test_batch = len(test_loader)
+    
+    T = config['temp']
+    avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
+    lambda_weight = np.ones([2, total_epoch])
+    
+    for index in range(total_epoch):
+        cost = np.zeros(12, dtype=np.float32)
+
+        # apply Dynamic Weight Average
+        if config['weight'] == 'dwa':
+            if index == 0 or index == 1:
+                lambda_weight[:, index] = 1.0
+            else:
+                w_1 = avg_cost[index - 1, 0] / avg_cost[index - 2, 0]
+                w_2 = avg_cost[index - 1, 3] / avg_cost[index - 2, 3]
+                lambda_weight[0, index] = 2 * np.exp(w_1 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T))
+                lambda_weight[1, index] = 2 * np.exp(w_2 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T))
+
+        # iteration for all batches
+        multi_task_model.train()
+        train_dataset = iter(train_loader)
+        conf_mat = ConfMatrix(multi_task_model.class_nb)
+        for k in range(train_batch):
+            train_data, train_label, train_depth = train_dataset.next()
+            train_data, train_label = train_data.to(device), train_label.long().to(device)
+            train_depth = train_depth.to(device)
+
+            train_pred, logsigma = multi_task_model(train_data)
+
+            optimizer.zero_grad()
+            train_loss = [model_fit(train_pred[0], train_label, 'semantic'),
+                          model_fit(train_pred[1], train_depth, 'depth')]
+
+            if config['weight'] == 'equal' or config['weight'] == 'dwa':
+                loss = sum([lambda_weight[i, index] * train_loss[i] for i in range(2)])
+            else:
+                loss = sum(1 / (2 * torch.exp(logsigma[i])) * train_loss[i] + logsigma[i] / 2 for i in range(2))
+
+            loss.backward()
+            optimizer.step()
+
+            # accumulate label prediction for every pixel in training images
+            conf_mat.update(train_pred[0].argmax(1).flatten(), train_label.flatten())
+
+            cost[0] = train_loss[0].item()
+            cost[3] = train_loss[1].item()
+            cost[4], cost[5] = depth_error(train_pred[1], train_depth)
+            avg_cost[index, :6] += cost[:6] / train_batch
+
+        # compute mIoU and acc
+        avg_cost[index, 1:3] = conf_mat.get_metrics()
+
+        # evaluating test data
+        multi_task_model.eval()
+        conf_mat = ConfMatrix(multi_task_model.class_nb)
+        with torch.no_grad():  # operations inside don't track history
+            test_dataset = iter(test_loader)
+            for k in range(test_batch):
+                test_data, test_label, test_depth = test_dataset.next()
+                test_data, test_label = test_data.to(device), test_label.long().to(device)
+                test_depth = test_depth.to(device)
+
+                test_pred, _ = multi_task_model(test_data)
+                test_loss = [model_fit(test_pred[0], test_label, 'semantic'),
+                             model_fit(test_pred[1], test_depth, 'depth')]
+
+                conf_mat.update(test_pred[0].argmax(1).flatten(), test_label.flatten())
+
+                cost[6] = test_loss[0].item()
+                cost[9] = test_loss[1].item()
+                cost[10], cost[11] = depth_error(test_pred[1], test_depth)
+                avg_cost[index, 6:] += cost[6:] / test_batch
+
+            # compute mIoU and acc
+            avg_cost[index, 7:9] = conf_mat.get_metrics()
+
+        scheduler.step()
+        print('Epoch: {:04d} | TRAIN: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} ||'
+            'TEST: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} '
+            .format(index, avg_cost[index, 0], avg_cost[index, 1], avg_cost[index, 2], avg_cost[index, 3],
+                    avg_cost[index, 4], avg_cost[index, 5], avg_cost[index, 6], avg_cost[index, 7], avg_cost[index, 8],
+                    avg_cost[index, 9], avg_cost[index, 10], avg_cost[index, 11]))
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+config = {
+    'temp': 2.0,
+    'weight': 'dwa'
+}
+
+mt_model = DenseDrive().to(device)
+optimizer = optim.Adam(DenseDrive.parameters(), lr=1e-3)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+
+print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
+
+dataset_path = '../input/cityscapes-depth-and-segmentation/data'
+train_set = CityScapes(root=dataset_path, train=True)
+test_set = CityScapes(root=dataset_path, train=False)
+
+batch_size = 8
+train_loader = torch.utils.data.DataLoader(
+               dataset=train_set,
+               batch_size=batch_size,
+               shuffle=True)
+
+test_loader = torch.utils.data.DataLoader(
+              dataset=test_set,
+              batch_size=batch_size,
+              shuffle=False)
+
+multi_task_trainer(train_loader,
+    test_loader,
+    mt_model,
+    device,
+    optimizer,
+    scheduler,
+    config,
+    100)

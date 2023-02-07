@@ -5,7 +5,6 @@ import torch
 import fnmatch
 
 import numpy as np
-import panoptic_parts as pp
 import torch.utils.data as data
 import matplotlib.pylab as plt
 import torchvision.transforms as transforms
@@ -40,7 +39,7 @@ class DataTransform(object):
             # Resize based on randomly sampled scale
             if task in ['im']:
                 data_dict[task] = transforms_f.resize(data_dict[task], resized_size, Image.BILINEAR)
-            elif task in ['depth', 'seg', 'part_seg', 'disp']:
+            elif task in ['depth', 'seg', 'disp']:
                 data_dict[task] = transforms_f.resize(data_dict[task], resized_size, Image.NEAREST)
 
             # Add padding if crop size is smaller than the resized size
@@ -49,7 +48,7 @@ class DataTransform(object):
                 if task in ['im']:
                     data_dict[task] = transforms_f.pad(data_dict[task], padding=(0, 0, right_pad, bottom_pad),
                                                        padding_mode='reflect')
-                elif task in ['seg', 'part_seg', 'disp']:
+                elif task in ['seg', 'disp']:
                     data_dict[task] = transforms_f.pad(data_dict[task], padding=(0, 0, right_pad, bottom_pad),
                                                        fill=-1, padding_mode='constant')  # -1 will be ignored in loss
                 elif task in ['depth']:
@@ -72,7 +71,7 @@ class DataTransform(object):
             if task == 'disp':  # disparity is inverse depth
                 data_dict[task] = data_dict[task] * sc
 
-            if task in ['seg', 'part_seg']:
+            if task == 'seg':
                 data_dict[task] = data_dict[task].squeeze(0)
         return data_dict
 
