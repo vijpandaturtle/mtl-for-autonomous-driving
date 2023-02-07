@@ -64,9 +64,7 @@ class DataTransform(object):
             # Random Flip
             if flip_prop > 0.5:
                 data_dict[task] = torch.flip(data_dict[task], dims=[2])
-                if task == 'normal':
-                    data_dict[task][0, :, :] = - data_dict[task][0, :, :]
-
+           
             # Final Check:
             if task == 'depth':
                 data_dict[task] = data_dict[task] / sc
@@ -83,9 +81,8 @@ class CityScapes(data.Dataset):
     CityScapes dataset, 4 tasks
     Included tasks:
         1. Semantic Segmentation,
-        2. Instance Segmentation,
-        3. Part Segmentation,
-        4. Disparity Estimation (Inverse Depth),
+        2. Part Segmentation,
+        3. Disparity Estimation (Inverse Depth),
     """
     def __init__(self, root, train=True, augmentation=False):
         self.train = train
@@ -99,13 +96,13 @@ class CityScapes(data.Dataset):
             self.data_path = root + '/val'
 
         # calculate data length
-        self.data_len = len(fnmatch.filter(os.listdir(self.data_path + '/image'), '*.png'))
+        self.data_len = len(fnmatch.filter(os.listdir(self.data_path + '/images'), '*.png'))
     
     def __len__(self):
         return self.data_len
 
     def decode_seg_map(self, mask):
-        # source: https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
+        # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
         mask_map = np.zeros_like(mask)
         mask_map[np.isin(mask, [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30])] = -1
         mask_map[np.isin(mask, [7])] = 0
@@ -131,8 +128,8 @@ class CityScapes(data.Dataset):
     
     def decode_part_seg_map(self, mask):
         # https://panoptic-parts.readthedocs.io/en/stable/api_and_code.html
-        # https://arxiv.org/abs/2004.07944
         mask = pp.decode_uids(mask, return_sids_pids=True)[-1]
+        mask_map = np.zeros_like(mask)
         mask_map[np.isin(mask, [2401, 2501])] = 1    # human/rider torso
         mask_map[np.isin(mask, [2402, 2502])] = 2    # human/rider head
         mask_map[np.isin(mask, [2403, 2503])] = 3    # human/rider arms
@@ -145,42 +142,18 @@ class CityScapes(data.Dataset):
         return mask_map
 
     def decode_disparity_map(self, disparity):
-        # https://github.com/mcordts/cityscapesScripts/issues/55#issuecomment-411486510
         # remap invalid points to -1 (not to conflict with 0, infinite depth, such as sky)
         disparity[disparity == 0] = -1
         # reduce by a factor of 4 based on the rescaled resolution
         disparity[disparity > -1] = (disparity[disparity > -1] - 1) / (256 * 4)
         return disparity
     
-    def decode_instance_map(cls, pic, class_id=None):
-        class_names = ('person', 'rider', 'car', 'truck',
-                   'bus', 'train', 'motorcycle', 'bicycle')
-        class_ids = (24, 25, 26, 27, 28, 31, 32, 33)
-
-        pic = np.array(pic, copy=False)
-
-        instance_map = np.zeros(
-            (pic.shape[0], pic.shape[1]), dtype=np.uint8)
-
-        # contains the class of each instance, but will set the class of "unlabeled instances/groups" to bg
-        class_map = np.zeros(
-            (pic.shape[0], pic.shape[1]), dtype=np.uint8)
-
-        for i, c in enumerate(cls.class_ids):
-            mask = np.logical_and(pic >= c * 1000, pic < (c + 1) * 1000)
-            if mask.sum() > 0:
-                ids, _, _ = relabel_sequential(pic[mask])
-                instance_map[mask] = ids + np.amax(instance_map)
-                class_map[mask] = i+1
-
-        return Image.fromarray(instance_map), Image.fromarray(class_map)
-    
     def __getitem__(self, index):
         # load data from the pre-processed npy files
-        image = torch.from_numpy(np.moveaxis(plt.imread(self.data_path + '/image/{:d}.png'.format(index)), -1, 0)).float()
+        image = torch.from_numpy(np.moveaxis(plt.imread(self.data_path + '/images/{:d}.png'.format(index)), -1, 0)).float()
         disparity = cv2.imread(self.data_path + '/depth/{:d}.png'.format(index), cv2.IMREAD_UNCHANGED).astype(np.float32)
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
-        seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)), dtype=float)
+        seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
         seg = torch.from_numpy(self.decode_seg_map(seg)).long()
         part_seg = np.array(Image.open(self.data_path + '/part_seg/{:d}.tif'.format(index)))
         part_seg = torch.from_numpy(self.decode_part_seg_map(part_seg)).long()

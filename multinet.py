@@ -5,7 +5,7 @@ import torch.nn as nn
 from lib.model.neck import BiFPN
 from lib.model.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
-class DenseMultiNet(nn.Module):
+class DenseDrive(nn.Module):
     def __init__(self, backbone='convnext_atto', backbone_indices=(0, 1, 2, 3)):
         super().__init__()
 
@@ -35,7 +35,7 @@ class DenseMultiNet(nn.Module):
 
         self.part_segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1, #Part Segmentation Classes
+            out_channels=7, #Part Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -49,14 +49,6 @@ class DenseMultiNet(nn.Module):
             upsampling=4,
         )
 
-        # self.instance_segmentation_head = SegmentationHead(
-        #     in_channels=64,
-        #     out_channels=1, #Instance Classes
-        #     activation=None,
-        #     kernel_size=1,
-        #     upsampling=4,
-        # )
-
     def forward(self, x):
         p2, p3, p4, p5 = self.backbone(x)[-4:]
        
@@ -67,12 +59,13 @@ class DenseMultiNet(nn.Module):
     
         outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
 
+        instance_seg_maps = self.instance_segmentation_head(outputs)
         semantic_seg_map = self.segmentation_head(outputs)
         part_seg_map = self.part_segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
         
-        return instance_maps, semantic_seg_map, part_seg_map, depth_map
+        return instance_seg_maps, semantic_seg_map, part_seg_map, depth_map
 
 data = torch.randn((1, 3, 512, 256))
-model = DenseMultiNet()
-out1, out2, out3 = model(data)
+model = DenseDrive()
+out1, out2, out3, out4 = model(data)

@@ -5,39 +5,6 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-class DiceLoss(nn.Module):
-    """Dice loss, need one hot encode input
-    Args:
-        weight: An array of shape [num_classes,]
-        ignore_index: class index to ignore
-        predict: A tensor of shape [N, C, *]
-        target: A tensor of same shape with predict
-        other args pass to BinaryDiceLoss
-    Return:
-        same as BinaryDiceLoss
-    """
-    def __init__(self, weight=None, ignore_index=None, **kwargs):
-        super(DiceLoss, self).__init__()
-        self.kwargs = kwargs
-        self.weight = weight
-        self.ignore_index = ignore_index
-
-    def forward(self, predict, target):
-        assert predict.shape == target.shape, 'predict & target shape do not match'
-        dice = BinaryDiceLoss(**self.kwargs)
-        total_loss = 0
-        predict = F.softmax(predict, dim=1)
-
-        for i in range(target.shape[1]):
-            if i != self.ignore_index:
-                dice_loss = dice(predict[:, i], target[:, i])
-                if self.weight is not None:
-                    assert self.weight.shape[0] == target.shape[1], \
-                        'Expect weight shape [{}], get[{}]'.format(target.shape[1], self.weight.shape[0])
-                    dice_loss *= self.weights[i]
-                total_loss += dice_loss
-
-        return total_loss/target.shape[1]
 
 class InvHuberLoss(nn.Module):
     """Inverse Huber Loss for depth estimation.
@@ -79,4 +46,28 @@ def compute_loss(pred, gt, task_id):
                 / torch.nonzero(valid_mask, as_tuple=False).size(0)
     return loss
 
+class ModelWithLoss(nn.Module):
+    def __init__(self, model, debug=False):
+        super().__init__()
+        self.model = model
+        self.criterion = FocalLoss()
+        self.seg_criterion1 = TverskyLoss(mode=self.model.seg_mode, alpha=0.7, beta=0.3, gamma=4.0/3, from_logits=True)
+        self.seg_criterion2 = FocalLossSeg(mode=self.model.seg_mode, alpha=0.25)
+        self.debug = debug
 
+    def forward(self, imgs, annotations, seg_annot, obj_list=None):
+        _, regression, classification, anchors, segmentation = self.model(imgs)
+
+        if self.debug:
+            cls_loss, reg_loss = self.criterion(classification, regression, anchors, annotations,
+                                                imgs=imgs, obj_list=obj_list)
+            tversky_loss = self.seg_criterion1(segmentation, seg_annot)
+            focal_loss = self.seg_criterion2(segmentation, seg_annot)
+        else:
+            cls_loss, reg_loss = self.criterion(classification, regression, anchors, annotations)
+            tversky_loss = self.seg_criterion1(segmentation, seg_annot)
+            focal_loss = self.seg_criterion2(segmentation, seg_annot)
+
+        seg_loss = tversky_loss + 1 * focal_loss
+
+        return cls_loss, reg_loss, seg_loss, regression, classification, anchors, segmentation
