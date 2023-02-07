@@ -33,14 +33,6 @@ class DenseDrive(nn.Module):
             upsampling=4,
         )
 
-        self.part_segmentation_head = SegmentationHead(
-            in_channels=64,
-            out_channels=7, #Part Segmentation Classes
-            activation=None,
-            kernel_size=1,
-            upsampling=4,
-        )
-
         self.depth_estimation_head = SegmentationHead(
             in_channels=64,
             out_channels=1, #Depth Classes
@@ -59,12 +51,35 @@ class DenseDrive(nn.Module):
     
         outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
 
-        instance_seg_maps = self.instance_segmentation_head(outputs)
         semantic_seg_map = self.segmentation_head(outputs)
-        part_seg_map = self.part_segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
         
-        return instance_seg_maps, semantic_seg_map, part_seg_map, depth_map
+        return semantic_seg_map, depth_map
+
+     def initialize_decoder(self, module):
+        for m in module.modules():
+
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, mode="fan_in", nonlinearity="relu")
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+
+    def initialize_head(self, module):
+        for m in module.modules():
+            if isinstance(m, (nn.Linear, nn.Conv2d)):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
 data = torch.randn((1, 3, 512, 256))
 model = DenseDrive()

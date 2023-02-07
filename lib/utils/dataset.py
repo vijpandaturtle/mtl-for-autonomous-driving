@@ -78,11 +78,10 @@ class DataTransform(object):
 
 class CityScapes(data.Dataset):
     """
-    CityScapes dataset, 4 tasks
+    CityScapes dataset
     Included tasks:
         1. Semantic Segmentation,
-        2. Part Segmentation,
-        3. Disparity Estimation (Inverse Depth),
+        2. Disparity Estimation (Inverse Depth),
     """
     def __init__(self, root, train=True, augmentation=False):
         self.train = train
@@ -126,21 +125,6 @@ class CityScapes(data.Dataset):
         mask_map[np.isin(mask, [33])] = 18
         return mask_map
     
-    def decode_part_seg_map(self, mask):
-        # https://panoptic-parts.readthedocs.io/en/stable/api_and_code.html
-        mask = pp.decode_uids(mask, return_sids_pids=True)[-1]
-        mask_map = np.zeros_like(mask)
-        mask_map[np.isin(mask, [2401, 2501])] = 1    # human/rider torso
-        mask_map[np.isin(mask, [2402, 2502])] = 2    # human/rider head
-        mask_map[np.isin(mask, [2403, 2503])] = 3    # human/rider arms
-        mask_map[np.isin(mask, [2404, 2504])] = 4    # human/rider legs
-        mask_map[np.isin(mask, [2601, 2701, 2801])] = 5  # car/truck/bus windows
-        mask_map[np.isin(mask, [2602, 2702, 2802])] = 6  # car/truck/bus wheels
-        mask_map[np.isin(mask, [2603, 2703, 2803])] = 7  # car/truck/bus lights
-        mask_map[np.isin(mask, [2604, 2704, 2804])] = 8  # car/truck/bus license_plate
-        mask_map[np.isin(mask, [2605, 2705, 2805])] = 9  # car/truck/bus chassis
-        return mask_map
-
     def decode_disparity_map(self, disparity):
         # remap invalid points to -1 (not to conflict with 0, infinite depth, such as sky)
         disparity[disparity == 0] = -1
@@ -155,10 +139,8 @@ class CityScapes(data.Dataset):
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
         seg = torch.from_numpy(self.decode_seg_map(seg)).long()
-        part_seg = np.array(Image.open(self.data_path + '/part_seg/{:d}.tif'.format(index)))
-        part_seg = torch.from_numpy(self.decode_part_seg_map(part_seg)).long()
-
-        data_dict = {'im': image, 'seg': seg, 'part_seg': part_seg, 'disp': disparity}
+    
+        data_dict = {'im': image, 'seg': seg, 'disp': disparity}
 
         # apply data augmentation if required
         if self.augmentation:
