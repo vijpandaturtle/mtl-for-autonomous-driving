@@ -1,26 +1,4 @@
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
-def model_fit(x_pred, x_output, task_type):
-    device = x_pred.device
-
-    # binary mark to mask out undefined pixel space
-    binary_mask = (torch.sum(x_output, dim=1) != 0).float().unsqueeze(1).to(device)
-
-    if task_type == 'semantic':
-        # semantic loss: depth-wise cross entropy
-        loss = F.nll_loss(x_pred, x_output, ignore_index=-1)
-
-    if task_type == 'depth':
-        # depth loss: l1 norm
-        loss = torch.sum(torch.abs(x_pred - x_output) * binary_mask) / torch.nonzero(binary_mask, as_tuple=False).size(0)
-
-    if task_type == 'normal':
-        # normal loss: dot product
-        loss = 1 - torch.sum((x_pred * x_output) * binary_mask) / torch.nonzero(binary_mask, as_tuple=False).size(0)
-
-    return loss
+import torch 
 
 # New mIoU and Acc. formula: accumulate every pixel and average across all pixels in all images
 class ConfMatrix(object):

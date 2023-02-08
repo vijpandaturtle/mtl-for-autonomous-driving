@@ -7,11 +7,12 @@ from lib.model.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
 class DenseDrive(nn.Module):
     def __init__(self, backbone='convnext_atto', backbone_indices=(0, 1, 2, 3)):
-        super().__init__()
+        super(DenseDrive, self).__init__()
 
         self.fpn_num_filters = 64
         self.fpn_cell_repeats = 3
         self.conv_channels = [80, 160, 320]
+        self.class_nb = 19
         
         self.backbone = timm.create_model('convnext_atto', features_only=True, out_indices=backbone_indices, pretrained=True)
         
@@ -27,7 +28,7 @@ class DenseDrive(nn.Module):
        
         self.segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=19, #Semantic Segmentation Classes
+            out_channels=1, #Semantic Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -41,6 +42,11 @@ class DenseDrive(nn.Module):
             upsampling=4,
         )
 
+        self.initialize_decoder(self.bifpndecoder)
+        self.initialize_head(self.segmentation_head)
+        self.initialize_head(self.depth_estimation_head)
+        self.initialize_decoder(self.neck)
+
     def forward(self, x):
         p2, p3, p4, p5 = self.backbone(x)[-4:]
        
@@ -53,7 +59,6 @@ class DenseDrive(nn.Module):
 
         semantic_seg_map = self.segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
-        
         return semantic_seg_map, depth_map
 
     def initialize_decoder(self, module):
@@ -80,3 +85,5 @@ class DenseDrive(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
+
+

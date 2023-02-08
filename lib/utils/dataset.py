@@ -137,7 +137,7 @@ class CityScapes(data.Dataset):
         disparity = cv2.imread(self.data_path + '/depth/{:d}.png'.format(index), cv2.IMREAD_UNCHANGED).astype(np.float32)
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
-        seg = torch.from_numpy(self.decode_seg_map(seg)).long()
+        seg = torch.from_numpy(self.decode_seg_map(seg)).unsqueeze(0).float()
     
         data_dict = {'im': image, 'seg': seg, 'disp': disparity}
 
@@ -146,7 +146,7 @@ class CityScapes(data.Dataset):
             data_dict = DataTransform(crop_size=[256, 256], scales=[1.0])(data_dict)
 
         im = 2. * data_dict.pop('im') - 1.  # normalised to [-1, 1]
-        return im, data_dict
+        return im, data_dict['seg'], data_dict['disp']
     
     
 
