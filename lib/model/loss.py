@@ -31,6 +31,29 @@ class InvHuberLoss(nn.Module):
         cost = torch.mean(err * mask_err.float() + err2 * mask_err2.float())
         return cost    
 
+class SILogLoss(nn.Module):
+    """
+    Compute SILog loss. See https://papers.nips.cc/paper/2014/file/7bccfde7714a1ebadf06c5f4cea752c1-Paper.pdf for
+    more information about scale-invariant loss.
+    Args:
+        prediction (Tensor): Prediction.
+        target (Tensor): Target.
+        variance_focus (float): Variance focus for the SILog computation.
+    Returns:
+        float: SILog loss.
+    """
+    def __init__(self, variance_focus = 0.85):
+        super(InvHuberLoss, self).__init__()
+        self.variance_focus = variance_focus
+
+    def forward(self, x, target):
+        # let's only compute the loss on non-null pixels from the ground-truth depth-map
+        non_zero_mask = (target > 0) & (x > 0)
+        # SILog
+        d = torch.log(x[non_zero_mask]) - torch.log(target[non_zero_mask])
+        return torch.sqrt((d ** 2).mean() - self.variance_focus * (d.mean() ** 2)) * 10.0
+
+
 def compute_loss(pred, gt, task_id):
     """
     Compute task-specific loss.
