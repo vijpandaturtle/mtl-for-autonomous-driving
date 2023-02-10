@@ -45,8 +45,9 @@ def compute_loss(pred, gt, task_id):
     elif task_id == 'depth':
         # L1 Loss with Ignored Region (values are 0 or -1)
         invalid_idx = 250 if task_id == 'disp' else 0
+        loss_fn = InvHuberLoss()
         valid_mask = (torch.sum(gt, dim=1, keepdim=True) != invalid_idx).to(pred.device)
-        loss = torch.sum(F.l1_loss(pred, gt, reduction='none').masked_select(valid_mask)) \
+        loss = torch.sum(loss_fn(pred, gt).masked_select(valid_mask)) \
                 / torch.nonzero(valid_mask, as_tuple=False).size(0)
     return loss
 
