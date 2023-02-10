@@ -1,4 +1,3 @@
-import timm
 import torch 
 import torch.nn as nn
 
@@ -6,7 +5,7 @@ from lib.model.neck import BiFPN
 from lib.model.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
 class DenseDrive(nn.Module):
-    def __init__(self, backbone='convnext_atto', backbone_indices=(0, 1, 2, 3)):
+    def __init__(self, backbone):
         super(DenseDrive, self).__init__()
 
         self.fpn_num_filters = 64
@@ -14,7 +13,7 @@ class DenseDrive(nn.Module):
         self.conv_channels = [80, 160, 320]
         self.class_nb = 19
         
-        self.backbone = timm.create_model('convnext_atto', features_only=True, out_indices=backbone_indices, pretrained=True)
+        self.backbone = backbone
         
         self.neck = nn.Sequential(
             *[BiFPN(self.fpn_num_filters, self.conv_channels,
