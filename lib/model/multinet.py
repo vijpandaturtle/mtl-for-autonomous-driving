@@ -28,7 +28,7 @@ class DenseDrive(nn.Module):
        
         self.segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1, #Semantic Segmentation Classes
+            out_channels=self.class_nb, #Semantic Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,

@@ -16,26 +16,14 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, config, total_epoch=200):
+def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch=200):
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
-    T = config['temp']
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
-    lambda_weight = np.ones([2, total_epoch])
     
     for index in range(total_epoch):
         cost = np.zeros(12, dtype=np.float32)
-
-        # apply Dynamic Weight Average
-        if config['weight'] == 'dwa':
-            if index == 0 or index == 1:
-                lambda_weight[:, index] = 1.0
-            else:
-                w_1 = avg_cost[index - 1, 0] / avg_cost[index - 2, 0]
-                w_2 = avg_cost[index - 1, 3] / avg_cost[index - 2, 3]
-                lambda_weight[0, index] = 2 * np.exp(w_1 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T))
-                lambda_weight[1, index] = 2 * np.exp(w_2 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T))
 
         # iteration for all batches
         multi_task_model.train()
@@ -45,16 +33,16 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_data, train_label, train_depth = train_dataset.next()
             train_data, train_label = train_data.to(device), train_label.to(device)
             train_depth = train_depth.to(device)
-
+            train_label = train_label.squeeze(1).long()
+         
             seg_pred, depth_pred = multi_task_model(train_data)
-     
+            print(seg_pred.shape, train_label.shape)
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             print(train_loss)
-
-            if config['weight'] == 'equal' or config['weight'] == 'dwa':
-                loss = sum([lambda_weight[i, index] * train_loss[i] for i in range(2)])
+          
+            loss = sum([train_loss[i] for i in range(2)])
            
             loss.backward()
             optimizer.step()
@@ -79,16 +67,18 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                 test_data, test_label, test_depth = test_dataset.next()
                 test_data, test_label = test_data.to(device), test_label.to(device)
                 test_depth = test_depth.to(device)
+                test_label = train_label.squeeze(1).long()
 
                 test_seg_pred, test_depth_pred = multi_task_model(test_data)
                 test_loss = [compute_loss(test_seg_pred, test_label, 'semantic'),
                              compute_loss(test_depth_pred, test_depth, 'depth')]
 
-                conf_mat.update(seg_pred.argmax(1).flatten(), test_label.flatten())
+
+                conf_mat.update(test_seg_pred.argmax(1).flatten(), test_label.flatten())
 
                 cost[6] = test_loss[0].item()
                 cost[9] = test_loss[1].item()
-                cost[10], cost[11] = depth_error(test_pred[1], test_depth)
+                cost[10], cost[11] = depth_error(test_depth_pred, test_depth)
                 avg_cost[index, 6:] += cost[6:] / test_batch
 
             # compute mIoU and acc
@@ -103,10 +93,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-config = {
-    'temp': 2.0,
-    'weight': 'dwa'
-}
 
 mt_model = DenseDrive().to(device)
 freeze_backbone = True
@@ -130,22 +116,17 @@ dataset_path = 'cityscapes'
 train_set = CityScapes(root=dataset_path, train=True)
 test_set = CityScapes(root=dataset_path, train=False)
 
-batch_size = 16
+batch_size = 25
 train_loader = torch.utils.data.DataLoader(
                dataset=train_set,
                batch_size=batch_size,
+               drop_last=True, #difference in no of samples in last batch
                shuffle=True)
 
 test_loader = torch.utils.data.DataLoader(
               dataset=test_set,
               batch_size=batch_size,
+              drop_last=True,
               shuffle=False)
 
-multi_task_trainer(train_loader,
-    test_loader,
-    mt_model,
-    device,
-    optimizer,
-    scheduler,
-    config,
-    100)
+multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, 100)

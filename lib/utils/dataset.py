@@ -102,7 +102,8 @@ class CityScapes(data.Dataset):
     def decode_seg_map(self, mask):
         # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
         mask_map = np.zeros_like(mask)
-        mask_map[np.isin(mask, [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30])] = -1
+        #void classes
+        mask_map[np.isin(mask, [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1])] = 250
         mask_map[np.isin(mask, [7])] = 0
         mask_map[np.isin(mask, [8])] = 1
         mask_map[np.isin(mask, [11])] = 2
@@ -137,8 +138,8 @@ class CityScapes(data.Dataset):
         disparity = cv2.imread(self.data_path + '/depth/{:d}.png'.format(index), cv2.IMREAD_UNCHANGED).astype(np.float32)
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
-        seg = torch.from_numpy(self.decode_seg_map(seg)).unsqueeze(0).float()
-    
+        seg = torch.from_numpy(self.decode_seg_map(seg)).unsqueeze(0).long()
+        print(np.isin(seg, [255]))
         data_dict = {'im': image, 'seg': seg, 'disp': disparity}
 
         # apply data augmentation if required
