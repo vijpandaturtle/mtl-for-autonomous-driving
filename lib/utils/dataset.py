@@ -139,7 +139,6 @@ class CityScapes(data.Dataset):
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
         seg = torch.from_numpy(self.decode_seg_map(seg)).unsqueeze(0).long()
-        print(np.isin(seg, [255]))
         data_dict = {'im': image, 'seg': seg, 'disp': disparity}
 
         # apply data augmentation if required

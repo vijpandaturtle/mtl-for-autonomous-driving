@@ -36,7 +36,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_label = train_label.squeeze(1).long()
          
             seg_pred, depth_pred = multi_task_model(train_data)
-            print(seg_pred.shape, train_label.shape)
+        
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
