@@ -10,6 +10,7 @@ from lib.utils.dataset import CityScapes
 from lib.model.metrics import ConfMatrix, depth_error
 from lib.model.loss import compute_loss
 
+import timm
 import os
 import fnmatch
 import numpy as np
@@ -20,10 +21,25 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
-    avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
+    weight = 'dwa'
+    T = 2.0
+    avg_cost = np.zeros([total_epoch, 24], dtype=np.float32)
+    lambda_weight = np.ones([3, total_epoch])
     
     for index in range(total_epoch):
-        cost = np.zeros(12, dtype=np.float32)
+        cost = np.zeros(24, dtype=np.float32)
+
+        # apply Dynamic Weight Average
+        if weight == 'dwa':
+            if index == 0 or index == 1:
+                lambda_weight[:, index] = 1.0
+            else:
+                w_1 = avg_cost[index - 1, 0] / avg_cost[index - 2, 0]
+                w_2 = avg_cost[index - 1, 3] / avg_cost[index - 2, 3]
+                w_3 = avg_cost[index - 1, 6] / avg_cost[index - 2, 6]
+                lambda_weight[0, index] = 3 * np.exp(w_1 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
+                lambda_weight[1, index] = 3 * np.exp(w_2 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
+                lambda_weight[2, index] = 3 * np.exp(w_3 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
 
         # iteration for all batches
         multi_task_model.train()
@@ -42,7 +58,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                           compute_loss(depth_pred, train_depth, 'depth')]
             print(train_loss)
           
-            loss = sum([train_loss[i] for i in range(2)])
+            #loss = sum([train_loss[i] for i in range(2)])
+            loss = sum([lambda_weight[i, index] * train_loss[i] for i in range(2)])
            
             loss.backward()
             optimizer.step()
@@ -92,13 +109,15 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                     avg_cost[index, 9], avg_cost[index, 10], avg_cost[index, 11]))
 
 
+#################################################################################
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-mt_model = DenseDrive().to(device)
+backbone = timm.create_model('convnext_atto', features_only=True, out_indices=(0,1,2,3), pretrained=True)
+mt_model = DenseDrive(backbone).to(device)
+
 freeze_backbone = True
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
-    #model.bifpn.requires_grad_(False)
     print('[Info] freezed backbone')
 
 # if opt.freeze_seg:
