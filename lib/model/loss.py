@@ -69,9 +69,9 @@ class OrdinalLoss(nn.Module):
         """
         N, C, H, W = pred_softmax.size() # C - number of discrete sub-intervals (= number of channels)
 
-        K = torch.zeros((N, C, H, W), dtype=torch.int)#.cuda()
+        K = torch.zeros((N, C, H, W), dtype=torch.int).cuda()
         for i in range(C):
-            K[:, i, :, :] = K[:, i, :, :] + i * torch.ones((N, H, W), dtype=torch.int)#.cuda()
+            K[:, i, :, :] = K[:, i, :, :] + i * torch.ones((N, H, W), dtype=torch.int).cuda()
 
         mask = (K <= target_labels).detach()
         
