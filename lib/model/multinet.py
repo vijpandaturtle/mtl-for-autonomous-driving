@@ -11,7 +11,8 @@ class DenseDrive(nn.Module):
         self.fpn_num_filters = 64
         self.fpn_cell_repeats = 3
         self.conv_channels = [80, 160, 320]
-        self.class_nb = 19
+        self.seg_class_nb = 19
+        self.depth_class_nb = 30
         
         self.backbone = backbone
         
@@ -27,7 +28,7 @@ class DenseDrive(nn.Module):
        
         self.segmentation_head = SegmentationHead(
             in_channels=64,
-            out_channels=self.class_nb, #Semantic Segmentation Classes
+            out_channels=self.seg_class_nb, #Semantic Segmentation Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -35,7 +36,7 @@ class DenseDrive(nn.Module):
 
         self.depth_estimation_head = SegmentationHead(
             in_channels=64,
-            out_channels=1, #Depth Classes
+            out_channels=10, #Depth Classes
             activation=None,
             kernel_size=1,
             upsampling=4,

@@ -9,3 +9,4 @@ model = DenseDrive()
 print(count_parameters(model))
 #4.2M parameters
 #Without backbone, 0.86M trainable parameters
+

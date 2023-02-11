@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from lib.model.metrics import ConfMatrix, depth_error
 from lib.model.loss import compute_loss
+from lib.utils.discretization import SID
 
 def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch=200):
     train_batch = len(train_loader)
@@ -32,7 +33,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
         # iteration for all batches
         multi_task_model.train()
         train_dataset = iter(train_loader)
-        conf_mat = ConfMatrix(multi_task_model.class_nb)
+        conf_mat = ConfMatrix(multi_task_model.seg_class_nb)
         for k in tqdm(range(train_batch)):
             train_data, train_label, train_depth = next(train_dataset)
             train_data, train_label = train_data.to(device), train_label.to(device)
@@ -54,6 +55,9 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
            
             # accumulate label prediction for every pixel in training images
             conf_mat.update(seg_pred.argmax(1).flatten(), train_label.flatten())
+            sid_discretizer = SID(alpha=0.25, beta=31.5, K=10)
+            depth_pred = sid_discretizer.labels2depth(depth_pred.argmax(1)).unsqueeze(1)
+
 
             cost[0] = train_loss[0].item()
             cost[3] = train_loss[1].item()
@@ -65,7 +69,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
         # evaluating test data
         multi_task_model.eval()
-        conf_mat = ConfMatrix(multi_task_model.class_nb)
+        conf_mat = ConfMatrix(multi_task_model.seg_class_nb)
         with torch.no_grad():  # operations inside don't track history
             test_dataset = iter(test_loader)
             for k in tqdm(range(test_batch)):
@@ -80,6 +84,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
 
                 conf_mat.update(test_seg_pred.argmax(1).flatten(), test_label.flatten())
+                sid_discretizer = SID(alpha=0.25, beta=31.5, K=10)
+                test_depth_pred = sid_discretizer.labels2depth(test_depth_pred.argmax(1)).unsqueeze(1)
 
                 cost[6] = test_loss[0].item()
                 cost[9] = test_loss[1].item()

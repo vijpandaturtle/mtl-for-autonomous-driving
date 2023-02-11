@@ -10,6 +10,8 @@ import matplotlib.pylab as plt
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as transforms_f
 
+from lib.utils.discretization import SID
+
 from PIL import Image
 
 class DataTransform(object):
@@ -130,13 +132,18 @@ class CityScapes(data.Dataset):
         disparity[disparity == 0] = -1
         # reduce by a factor of 4 based on the rescaled resolution
         disparity[disparity > -1] = (disparity[disparity > -1] - 1) / (256 * 4)
+
+        sid_discretizer = SID(alpha=0.25, beta=31.5, K=10)
+        disparity = np.array(sid_discretizer.depth2labels(disparity))
         return disparity
     
     def __getitem__(self, index):
         # load data from the pre-processed npy files
         image = torch.from_numpy(np.moveaxis(plt.imread(self.data_path + '/images/{:d}.png'.format(index)), -1, 0)).float()
+        
         disparity = cv2.imread(self.data_path + '/depth/{:d}.png'.format(index), cv2.IMREAD_UNCHANGED).astype(np.float32)
         disparity = torch.from_numpy(self.decode_disparity_map(disparity)).unsqueeze(0).float()
+        
         seg = np.array(Image.open(self.data_path + '/seg/{:d}.png'.format(index)))
         seg = torch.from_numpy(self.decode_seg_map(seg)).unsqueeze(0).long()
         data_dict = {'im': image, 'seg': seg, 'disp': disparity}

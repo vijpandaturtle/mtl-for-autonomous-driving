@@ -11,12 +11,13 @@ from lib.utils.dataset import CityScapes
 from lib.model.multinet import DenseDrive
 from lib.trainer import multi_task_trainer
 
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 backbone = timm.create_model('convnext_atto', features_only=True, out_indices=(0,1,2,3), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
-freeze_backbone = True
+freeze_backbone = False
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
