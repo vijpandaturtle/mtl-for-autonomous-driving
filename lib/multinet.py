@@ -1,8 +1,9 @@
 import torch 
 import torch.nn as nn
+import torch.nn.functional as F
 
-from lib.model.neck import BiFPN
-from lib.model.heads import BiFPNDecoder, SegmentationHead, DepthHead
+from lib.neck import BiFPN
+from lib.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
 class DenseDrive(nn.Module):
     def __init__(self, backbone):
@@ -10,9 +11,8 @@ class DenseDrive(nn.Module):
 
         self.fpn_num_filters = 64
         self.fpn_cell_repeats = 3
-        self.conv_channels = [80, 160, 320]
+        self.conv_channels = [96, 192, 384]#[80,160,320] atto
         self.seg_class_nb = 19
-        self.depth_class_nb = 30
         
         self.backbone = backbone
         
@@ -36,7 +36,7 @@ class DenseDrive(nn.Module):
 
         self.depth_estimation_head = SegmentationHead(
             in_channels=64,
-            out_channels=10, #Depth Classes
+            out_channels=1, #Depth Classes
             activation=None,
             kernel_size=1,
             upsampling=4,
@@ -52,12 +52,12 @@ class DenseDrive(nn.Module):
        
         features = (p3, p4, p5)
         features = self.neck(features)
-        
+     
         p3,p4,p5,p6,p7 = features
     
         outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
-
-        semantic_seg_map = self.segmentation_head(outputs)
+        
+        semantic_seg_map = F.log_softmax(self.segmentation_head(outputs))
         depth_map = self.depth_estimation_head(outputs)
         return semantic_seg_map, depth_map
 

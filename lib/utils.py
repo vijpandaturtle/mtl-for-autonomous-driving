@@ -1,6 +1,25 @@
-import torch 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data.dataset import Dataset
 
-# New mIoU and Acc. formula: accumulate every pixel and average across all pixels in all images
+def compute_loss(x_pred, x_output, task_type):
+    device = x_pred.device
+
+    # binary mark to mask out undefined pixel space
+    binary_mask = (torch.sum(x_output, dim=1) != 0).float().unsqueeze(1).to(device)
+
+    if task_type == 'semantic':
+        # semantic loss: depth-wise cross entropy
+        loss = F.nll_loss(x_pred, x_output, ignore_index=-1)
+
+    if task_type == 'depth':
+        # depth loss: l1 norm
+        loss = torch.sum(torch.abs(x_pred - x_output) * binary_mask) / torch.nonzero(binary_mask, as_tuple=False).size(0)
+    return loss
+
+
+# mIoU and Acc. formula: accumulate every pixel and average across all pixels in all images
 class ConfMatrix(object):
     def __init__(self, num_classes):
         self.num_classes = num_classes
@@ -16,11 +35,11 @@ class ConfMatrix(object):
             self.mat += torch.bincount(inds, minlength=n ** 2).reshape(n, n)
 
     def get_metrics(self):
-        h = self.mat.float()
+        h = self.mat.float().cpu()
         acc = torch.diag(h).sum() / h.sum()
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
         return torch.mean(iu).item(), acc.item()
-
+    
 
 def depth_error(x_pred, x_output):
     device = x_pred.device
@@ -31,4 +50,3 @@ def depth_error(x_pred, x_output):
     rel_err = torch.abs(x_pred_true - x_output_true) / x_output_true
     return (torch.sum(abs_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item(), \
            (torch.sum(rel_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item()
-

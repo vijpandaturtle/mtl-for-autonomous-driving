@@ -1,8 +1,8 @@
 import torch 
 import torch.nn as nn
 
-from lib.model.blocks import SeparableConvBlock
-from lib.model.blocks import MaxPool2dStaticSamePadding, Conv2dStaticSamePadding, Swish
+from lib.blocks import SeparableConvBlock
+from lib.blocks import MaxPool2dStaticSamePadding, Conv2dStaticSamePadding, Swish
 
 class BiFPN(nn.Module):
     def __init__(self, num_channels, conv_channels, first_time=False, epsilon=1e-4, attention=True,

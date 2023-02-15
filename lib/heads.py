@@ -1,6 +1,6 @@
 import torch 
 import torch.nn as nn 
-from lib.model.blocks import SegmentationBlock, MergeBlock, Activation
+from lib.blocks import SegmentationBlock, MergeBlock, Activation
 
 class BiFPNDecoder(nn.Module):
     def __init__(
@@ -17,7 +17,7 @@ class BiFPNDecoder(nn.Module):
             for n_upsamples in [5,4, 3, 2, 1]
         ])
         
-        self.seg_p2 = SegmentationBlock(40, 64, n_upsamples=0)
+        self.seg_p2 = SegmentationBlock(48, 64, n_upsamples=0)
         self.merge = MergeBlock(merge_policy)
         self.dropout = nn.Dropout2d(p=dropout, inplace=True)
 
@@ -46,16 +46,4 @@ class DepthHead(nn.Sequential):
         upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
         activation = Activation(activation)
         super().__init__(conv2d, upsampling, activation)
-
-class ClassificationHead(nn.Sequential):
-    def __init__(self, in_channels, classes, pooling="avg", dropout=0.2, activation=None):
-        if pooling not in ("max", "avg"):
-            raise ValueError("Pooling should be one of ('max', 'avg'), got {}.".format(pooling))
-        pool = nn.AdaptiveAvgPool2d(1) if pooling == 'avg' else nn.AdaptiveMaxPool2d(1)
-        flatten = nn.Flatten()
-        dropout = nn.Dropout(p=dropout, inplace=True) if dropout else nn.Identity()
-        linear = nn.Linear(in_channels, classes, bias=True)
-        activation = Activation(activation)
-        super().__init__(pool, flatten, dropout, linear, activation)
-
 
