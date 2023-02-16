@@ -9,9 +9,14 @@ class DenseDrive(nn.Module):
     def __init__(self, backbone):
         super(DenseDrive, self).__init__()
 
-        self.fpn_num_filters = 64
+        self.fpn_num_filters = 88
         self.fpn_cell_repeats = 3
-        self.conv_channels = [96, 192, 384]#[80,160,320] atto
+        self.conv_channels = [160, 320, 640]
+        #convnext atto : [80,160,320], bifpn decoder : 40 channels atto
+        #convnext femto : [96, 192, 384], bifpn decoder : 48 channels
+        #convnext pico : 9M [128, 256, 512]
+        #convnext nano : 15.6M [160, 320, 640] bifpn decoder : pyramid : 128, segmentation : 128, 
+        #fpn_filters:88, segmblock 80, 128
         self.seg_class_nb = 19
         
         self.backbone = backbone
@@ -27,15 +32,15 @@ class DenseDrive(nn.Module):
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
         self.segmentation_head = SegmentationHead(
-            in_channels=64,
+            in_channels=128,
             out_channels=self.seg_class_nb, #Semantic Segmentation Classes
-            activation=None,
+            activation='softmax',
             kernel_size=1,
             upsampling=4,
         )
 
         self.depth_estimation_head = SegmentationHead(
-            in_channels=64,
+            in_channels=128,
             out_channels=1, #Depth Classes
             activation=None,
             kernel_size=1,
@@ -57,13 +62,12 @@ class DenseDrive(nn.Module):
     
         outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
         
-        semantic_seg_map = F.log_softmax(self.segmentation_head(outputs))
+        semantic_seg_map = self.segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
         return semantic_seg_map, depth_map
 
     def initialize_decoder(self, module):
         for m in module.modules():
-
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, mode="fan_in", nonlinearity="relu")
                 if m.bias is not None:

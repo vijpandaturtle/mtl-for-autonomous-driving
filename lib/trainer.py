@@ -9,25 +9,10 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
-    weight = 'dwa'
-    T = 2.0
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
-    lambda_weight = np.ones([3, total_epoch])
     
     for index in range(total_epoch):
         cost = np.zeros(12, dtype=np.float32)
-
-        # apply Dynamic Weight Average
-        if weight == 'dwa':
-            if index == 0 or index == 1:
-                lambda_weight[:, index] = 1.0
-            else:
-                w_1 = avg_cost[index - 1, 0] / avg_cost[index - 2, 0]
-                w_2 = avg_cost[index - 1, 3] / avg_cost[index - 2, 3]
-                w_3 = avg_cost[index - 1, 6] / avg_cost[index - 2, 6]
-                lambda_weight[0, index] = 3 * np.exp(w_1 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
-                lambda_weight[1, index] = 3 * np.exp(w_2 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
-                lambda_weight[2, index] = 3 * np.exp(w_3 / T) / (np.exp(w_1 / T) + np.exp(w_2 / T) + np.exp(w_3 / T))
 
         # iteration for all batches
         multi_task_model.train()
@@ -43,10 +28,10 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
-            print(train_loss)
+            #print(train_loss)
           
             #loss = sum([train_loss[i] for i in range(2)])
-            loss = sum([lambda_weight[i, index] * train_loss[i] for i in range(2)])
+            loss = 0.70*train_loss[0] + 0.30*train_loss[1]
            
             loss.backward()
             optimizer.step()
@@ -70,9 +55,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             test_dataset = iter(test_loader)
             for k in tqdm(range(test_batch)):
                 test_data, test_label, test_depth = next(test_dataset)
-                test_data, test_label = test_data.to(device), test_label.to(device)
+                test_data, test_label = test_data.to(device), test_label.squeeze(1).long().to(device)
                 test_depth = test_depth.to(device)
-                test_label = train_label.squeeze(1).long()
 
                 test_seg_pred, test_depth_pred = multi_task_model(test_data)
                 test_loss = [compute_loss(test_seg_pred, test_label, 'semantic'),

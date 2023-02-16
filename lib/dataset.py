@@ -26,7 +26,7 @@ class CityScapes(Dataset):
         image = torch.from_numpy(np.moveaxis(np.load(self.data_path + '/image/{:d}.npy'.format(index)), -1, 0))
         semantic = torch.from_numpy(np.load(self.data_path + '/label/{:d}.npy'.format(index)))
         depth = torch.from_numpy(np.moveaxis(np.load(self.data_path + '/depth/{:d}.npy'.format(index)), -1, 0))
-        
+
         return image.float(), semantic.float(), depth.float()
 
     def __len__(self):
