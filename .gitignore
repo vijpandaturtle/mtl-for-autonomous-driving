@@ -1,3 +1,4 @@
 cityscapes/
 cityscapes_processed/
+cityscapes_processed_large/
 __pycache__/

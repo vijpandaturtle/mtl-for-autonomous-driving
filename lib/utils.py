@@ -39,8 +39,7 @@ class ConfMatrix(object):
         acc = torch.diag(h).sum() / h.sum()
         iu = torch.diag(h) / (h.sum(1) + h.sum(0) - torch.diag(h))
         return torch.mean(iu).item(), acc.item()
-    
-
+            
 def depth_error(x_pred, x_output):
     device = x_pred.device
     binary_mask = (torch.sum(x_output, dim=1) != 0).unsqueeze(1).to(device)

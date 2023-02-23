@@ -7,7 +7,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data.dataset import Dataset
 
-from lib.dataset import CityScapes
+from lib.dataset import CityScapes, RandomScaleCrop
 from lib.multinet import DenseDrive
 from lib.trainer import multi_task_trainer
 
@@ -17,28 +17,22 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 backbone = timm.create_model('convnext_nano', features_only=True, out_indices=(0,1,2,3), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
-freeze_backbone = True
+freeze_backbone = False
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-# if opt.freeze_seg:
-#     model.bifpndecoder.requires_grad_(False)
-#     model.segmentation_head.requires_grad_(False)
-#     print('[Info] freezed segmentation head')
-
-
-optimizer = optim.Adam(mt_model.parameters(), lr=1e-4)
+optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
 dataset_path = 'cityscapes_processed'
-train_set = CityScapes(root=dataset_path, train=True)
+train_set = CityScapes(root=dataset_path, train=True, transforms=RandomScaleCrop(), random_flip=True)
 test_set = CityScapes(root=dataset_path, train=False)
 
 epochs = 100
-batch_size = 25
+batch_size = 8
 train_loader = torch.utils.data.DataLoader(
                dataset=train_set,
                batch_size=batch_size,
