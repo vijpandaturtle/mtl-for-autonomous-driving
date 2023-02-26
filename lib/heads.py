@@ -17,7 +17,7 @@ class BiFPNDecoder(nn.Module):
             for n_upsamples in [5,4, 3, 2, 1]
         ])
         
-        self.seg_p2 = SegmentationBlock(80, 128, n_upsamples=0)
+        self.seg_p2 = SegmentationBlock(96, 128, n_upsamples=0)
         self.merge = MergeBlock(merge_policy)
         self.dropout = nn.Dropout2d(p=dropout, inplace=True)
 
@@ -42,8 +42,10 @@ class SegmentationHead(nn.Sequential):
 
 class DepthHead(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, activation=None, upsampling=1):
-        conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_1 = nn.Conv2d(in_channels, 64, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_2 = nn.Conv2d(64, 32, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_3 = nn.Conv2d(32, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
         upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
         activation = Activation(activation)
-        super().__init__(conv2d, upsampling, activation)
+        super().__init__(conv2d_1, conv2d_2, conv2d_3, upsampling, activation)
 

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data.dataset import Dataset
 
 from lib.dataset import CityScapes, RandomScaleCrop
@@ -14,16 +15,19 @@ from lib.trainer import multi_task_trainer
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('convnext_nano', features_only=True, out_indices=(0,1,2,3), pretrained=True)
+backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0,1,2,3), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
-freeze_backbone = False
+freeze_backbone = True
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+optimizer = optim.AdamW(mt_model.parameters(), lr=1e-2)
+scheduler = CosineAnnealingWarmRestarts(optimizer, 
+                                        T_0 = 8,# Number of iterations for the first restart
+                                        T_mult = 1, # A factor increases TiTi​ after a restart
+                                        eta_min = 1e-4) # Minimum learning rate
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 

@@ -29,9 +29,9 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             #print(train_loss)
-          
+            loss_coeffs = (0.5, 0.5)
             #loss = sum([train_loss[i] for i in range(2)])
-            loss = 0.70*train_loss[0] + 0.30*train_loss[1]
+            loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
            
             loss.backward()
             optimizer.step()
