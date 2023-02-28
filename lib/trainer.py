@@ -29,8 +29,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             #print(train_loss)
-            loss_coeffs = (0.5, 0.5)
-            #loss = sum([train_loss[i] for i in range(2)])
+            loss_coeffs = (0.95, 0.05)
+
             loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
            
             loss.backward()
@@ -39,7 +39,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             # accumulate label prediction for every pixel in training images
             conf_mat.update(seg_pred.argmax(1).flatten(), train_label.flatten())
       
-
             cost[0] = train_loss[0].item()
             cost[3] = train_loss[1].item()
             cost[4], cost[5] = depth_error(depth_pred, train_depth)

@@ -9,9 +9,9 @@ class DenseDrive(nn.Module):
     def __init__(self, backbone):
         super(DenseDrive, self).__init__()
 
-        self.fpn_num_filters = 224
-        self.fpn_cell_repeats = 7
-        self.conv_channels = [192, 384, 768]
+        self.fpn_num_filters = 64
+        self.fpn_cell_repeats = 3
+        self.conv_channels = [40, 112, 320]
         self.seg_class_nb = 7
         
         self.backbone = backbone
@@ -27,7 +27,7 @@ class DenseDrive(nn.Module):
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
         self.segmentation_head = SegmentationHead(
-            in_channels=128,
+            in_channels=64,
             out_channels=self.seg_class_nb, #Semantic Segmentation Classes
             activation='logsoftmax',
             kernel_size=1,
@@ -35,7 +35,7 @@ class DenseDrive(nn.Module):
         )
 
         self.depth_estimation_head = DepthHead(
-            in_channels=128,
+            in_channels=64,
             out_channels=1, #Depth Classes
             activation=None,
             kernel_size=1,

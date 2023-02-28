@@ -12,22 +12,28 @@ from lib.dataset import CityScapes, RandomScaleCrop
 from lib.multinet import DenseDrive
 from lib.trainer import multi_task_trainer
 
+random_seed = 54321 # or any of your favorite number 
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0,1,2,3), pretrained=True)
+backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
-freeze_backbone = True
+freeze_backbone = False
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-optimizer = optim.AdamW(mt_model.parameters(), lr=1e-2)
+optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3)
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
-                                        T_0 = 8,# Number of iterations for the first restart
+                                        T_0 = 8, # Number of iterations for the first restart
                                         T_mult = 1, # A factor increases TiTi​ after a restart
-                                        eta_min = 1e-4) # Minimum learning rate
+                                        eta_min = 1e-6) # Minimum learning rate
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
@@ -35,8 +41,8 @@ dataset_path = 'cityscapes_processed'
 train_set = CityScapes(root=dataset_path, train=True, transforms=RandomScaleCrop(), random_flip=True)
 test_set = CityScapes(root=dataset_path, train=False)
 
-epochs = 100
-batch_size = 8
+epochs = 200
+batch_size = 16
 train_loader = torch.utils.data.DataLoader(
                dataset=train_set,
                batch_size=batch_size,

@@ -20,7 +20,7 @@ class SeparableConvBlock(nn.Module):
 
         self.activation = activation
         if self.activation:
-            self.swish = MemoryEfficientSwish() if not onnx_export else Swish()
+            self.mish = Mish()
 
     def forward(self, x):
         x = self.depthwise_conv(x)
@@ -30,15 +30,15 @@ class SeparableConvBlock(nn.Module):
             x = self.bn(x)
 
         if self.activation:
-            x = self.swish(x)
+            x = self.mish(x)
 
         return x
 
-class Conv3x3BNSwish(nn.Module):
+class Conv3x3BNMish(nn.Module):
     def __init__(self, in_channels, out_channels, upsample=False):
         super().__init__()
 
-        self.swish = Swish()
+        self.mish = Mish()
 
         self.upsample = upsample
 
@@ -50,7 +50,7 @@ class Conv3x3BNSwish(nn.Module):
         self.conv_sp = SeparableConvBlock(out_channels, onnx_export=False)
 
     def forward(self, x):
-        x = self.conv_sp(self.swish(self.block(x)))
+        x = self.conv_sp(self.mish(self.block(x)))
         if self.upsample:
             x = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=True)
         return x
@@ -60,11 +60,11 @@ class SegmentationBlock(nn.Module):
     def __init__(self, in_channels, out_channels, n_upsamples=0):
         super().__init__()
 
-        blocks = [Conv3x3BNSwish(in_channels, out_channels, upsample=bool(n_upsamples))]
+        blocks = [Conv3x3BNMish(in_channels, out_channels, upsample=bool(n_upsamples))]
 
         if n_upsamples > 1:
             for _ in range(1, n_upsamples):
-                blocks.append(Conv3x3BNSwish(out_channels, out_channels, upsample=True))
+                blocks.append(Conv3x3BNMish(out_channels, out_channels, upsample=True))
 
         self.block = nn.Sequential(*blocks)
 
@@ -96,6 +96,15 @@ class MergeBlock(nn.Module):
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
+
+class Mish(nn.Module):
+    """
+    Mish activation function is proposed in "Mish: A Self 
+    Regularized Non-Monotonic Neural Activation Function" 
+    paper, https://arxiv.org/abs/1908.08681.
+    """
+    def forward(self, x):
+        return x * torch.tanh(F.softplus(x))
 
 
 def drop_connect(inputs, p, training):
@@ -240,5 +249,58 @@ class Activation(nn.Module):
             raise ValueError('Activation should be callable/sigmoid/softmax/logsoftmax/tanh/None; got {}'.format(name))
     def forward(self, x):
         return self.activation(x)
+
+#########################################################################
+
+####Convolutional Layers####
+def conv3x3(in_channels, out_channels, stride=1, dilation=1, groups=1, bias=False):
+    """3x3 Convolution: Depthwise: 
+    """
+    return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=dilation, dilation=dilation, bias=bias, groups=groups)
+
+def conv1x1(in_channels, out_channels, stride=1, groups=1, bias=False,):
+    """
+    1x1 Convolution: Pointwise
+    """
+    return nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, padding=0, bias=bias, groups=groups)
+
+def batchnorm(num_features):
+    """
+    Batchnorm
+    """
+    return nn.BatchNorm2d(num_features, affine=True, eps=1e-5, momentum=0.1)
+
+def convbnrelu(in_channels, out_channels, kernel_size, stride=1, groups=1, act=True):
+    "conv-batchnorm-relu"
+    if act:
+        return nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=int(kernel_size / 2.), groups=groups, bias=False),
+                             batchnorm(out_channels),
+                             nn.ReLU6(inplace=True))
+    else:
+        return nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=int(kernel_size / 2.), groups=groups, bias=False),
+                             batchnorm(out_channels))
+
+####Chained Residual Pooling(CRP) Block -LightweightRefineNet####
+class CRPBlock(nn.Module):
+    """CRP definition"""
+    def __init__(self, in_planes, out_planes, n_stages, groups=False):
+        super().__init__() #Python 3
+        for i in range(n_stages):
+            setattr(self, '{}_{}'.format(i + 1, 'outvar_dimred'),
+                    conv1x1(in_planes if (i == 0) else out_planes,
+                            out_planes, stride=1,
+                            bias=False, groups=in_planes if groups else 1)) #setattr(object, name, value)
+
+        self.stride = 1
+        self.n_stages = n_stages
+        self.maxpool = nn.MaxPool2d(kernel_size=5, stride=1, padding=2)
+
+    def forward(self, x):
+        top = x
+        for i in range(self.n_stages):
+            top = self.maxpool(top)
+            top = getattr(self, '{}_{}'.format(i + 1, 'outvar_dimred'))(top)#getattr(object, name[, default])
+            x = top + x
+        return x
 
 
