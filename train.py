@@ -21,7 +21,7 @@ np.random.seed(random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=True)
+backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=False)
 mt_model = DenseDrive(backbone).to(device)
 
 freeze_backbone = False
@@ -29,16 +29,16 @@ if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3)
+optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3, weight_decay=1e-5)
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
                                         T_0 = 8, # Number of iterations for the first restart
                                         T_mult = 1, # A factor increases TiTi​ after a restart
-                                        eta_min = 1e-6) # Minimum learning rate
+                                        eta_min = 1e-4) # Minimum learning rate
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
 dataset_path = 'cityscapes_processed'
-train_set = CityScapes(root=dataset_path, train=True, transforms=RandomScaleCrop(), random_flip=True)
+train_set = CityScapes(root=dataset_path, train=True, transforms=RandomScaleCrop(), random_flip=False)
 test_set = CityScapes(root=dataset_path, train=False)
 
 epochs = 200

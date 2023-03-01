@@ -3,6 +3,27 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data.dataset import Dataset
 
+class MultiTaskLossWrapper(nn.Module):
+    def __init__(self, task_num):
+        super(MultiTaskLossWrapper, self).__init__()
+        self.task_num = task_num
+        self.log_vars = nn.Parameter(torch.zeros((task_num)))
+
+    def forward(self, preds, age, gender, ethnicity):
+
+        mse, crossEntropy = MSELossFlat(), CrossEntropyFlat()
+
+        loss1 = crossEntropy(preds[1],gender)
+        loss2 = crossEntropy(preds[2],ethnicity)
+
+        precision1 = torch.exp(-self.log_vars[1])
+        loss1 = precision1*loss1 + self.log_vars[1]
+
+        precision2 = torch.exp(-self.log_vars[2])
+        loss2 = precision2*loss2 + self.log_vars[2]
+        
+        return loss1+loss2
+
 def compute_loss(x_pred, x_output, task_type):
     device = x_pred.device
 
@@ -49,3 +70,4 @@ def depth_error(x_pred, x_output):
     rel_err = torch.abs(x_pred_true - x_output_true) / x_output_true
     return (torch.sum(abs_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item(), \
            (torch.sum(rel_err) / torch.nonzero(binary_mask, as_tuple=False).size(0)).item()
+

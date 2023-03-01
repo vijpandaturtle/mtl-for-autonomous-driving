@@ -54,9 +54,9 @@ class DenseDrive(nn.Module):
         features = self.neck(features)
      
         p3,p4,p5,p6,p7 = features
-    
+
         outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
-        
+
         semantic_seg_map = self.segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
         return semantic_seg_map, depth_map
