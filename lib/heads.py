@@ -7,7 +7,7 @@ class BiFPNDecoder(nn.Module):
             self,
             encoder_depth=5,
             pyramid_channels=64,
-            segmentation_channels=64,
+            segmentation_channels=512,
             dropout=0.1,
             merge_policy="add", ):
         super().__init__()
@@ -17,7 +17,7 @@ class BiFPNDecoder(nn.Module):
             for n_upsamples in [5, 4, 3, 2, 1]
         ])
         
-        self.seg_p2 = SegmentationBlock(24, 64, n_upsamples=0)
+        self.seg_p2 = SegmentationBlock(24, 512, n_upsamples=0)
         self.merge = MergeBlock(merge_policy)
         self.dropout = nn.Dropout2d(p=dropout, inplace=True)
 
@@ -34,15 +34,21 @@ class BiFPNDecoder(nn.Module):
 
 class SegmentationHead(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, activation=None, upsampling=1):
-        conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_0 = nn.Conv2d(in_channels, 256, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_1 = nn.Conv2d(256, 128, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_2 = nn.Conv2d(128, 64, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_3 = nn.Conv2d(64, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
         upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
         activation = Activation(activation)
-        super().__init__(conv2d, upsampling, activation)
+        super().__init__(conv2d_0, conv2d_1, conv2d_2, conv2d_3, upsampling, activation)
 
 class DepthHead(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size=3, activation=None, upsampling=1):
-        conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_0 = nn.Conv2d(in_channels, 256, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_1 = nn.Conv2d(256, 128, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_2 = nn.Conv2d(128, 64, kernel_size=kernel_size, padding=kernel_size // 2)
+        conv2d_3 = nn.Conv2d(64, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
         upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
         activation = Activation(activation)
-        super().__init__(conv2d, upsampling, activation)
+        super().__init__(conv2d_0, conv2d_1, conv2d_2, conv2d_3, upsampling, activation)
 

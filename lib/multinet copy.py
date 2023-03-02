@@ -27,7 +27,7 @@ class DenseDrive(nn.Module):
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
         self.segmentation_head = SegmentationHead(
-            in_channels=512,
+            in_channels=128,
             out_channels=self.seg_class_nb, #Semantic Segmentation Classes
             activation='logsoftmax',
             kernel_size=1,
@@ -35,7 +35,7 @@ class DenseDrive(nn.Module):
         )
 
         self.depth_estimation_head = DepthHead(
-            in_channels=512,
+            in_channels=128,
             out_channels=1, #Depth Classes
             activation='sigmoid',
             kernel_size=1,
