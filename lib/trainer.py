@@ -29,16 +29,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_depth = train_depth.to(device)
          
             seg_pred, depth_pred = multi_task_model(train_data)
-<<<<<<< Updated upstream
-
-            optimizer.zero_grad()
-            train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
-                          compute_loss(depth_pred, train_depth, 'depth')]
-            #print(train_loss)
-            loss_coeffs = (0.9, 0.1)
-
-            loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
-=======
     
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
@@ -48,7 +38,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             segm_loss = loss_coeffs[0]*train_loss[0]
             depth_loss = loss_coeffs[1]*train_loss[1]
             loss = segm_loss + depth_loss 
->>>>>>> Stashed changes
            
             loss.backward()
             optimizer.step()
@@ -87,14 +76,9 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
             # compute mIoU and acc
             avg_cost[index, 7:9] = np.array(conf_mat.get_metrics())
-<<<<<<< Updated upstream
-
-        scheduler.step()
-=======
         
         #scheduler.step()
         
->>>>>>> Stashed changes
         print('Epoch: {:04d} | TRAIN: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} ||'
             'TEST: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} '
             .format(index, avg_cost[index, 0], avg_cost[index, 1], avg_cost[index, 2], avg_cost[index, 3],
