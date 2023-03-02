@@ -1,13 +1,18 @@
 import torch
+import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 
 from lib.utils import ConfMatrix, depth_error
 from lib.utils import compute_loss
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch):
     train_batch = len(train_loader)
     test_batch = len(test_loader)
+
+    #criterion_segm = nn.CrossEntropyLoss()
+    criterion_depth = nn.MSELoss()
     
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
     
@@ -24,6 +29,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_depth = train_depth.to(device)
          
             seg_pred, depth_pred = multi_task_model(train_data)
+<<<<<<< Updated upstream
 
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
@@ -32,6 +38,17 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             loss_coeffs = (0.9, 0.1)
 
             loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
+=======
+    
+            optimizer.zero_grad()
+            train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
+                          criterion_depth(depth_pred, train_depth)]
+            
+            loss_coeffs = (0.95, 0.05)
+            segm_loss = loss_coeffs[0]*train_loss[0]
+            depth_loss = loss_coeffs[1]*train_loss[1]
+            loss = segm_loss + depth_loss 
+>>>>>>> Stashed changes
            
             loss.backward()
             optimizer.step()
@@ -59,9 +76,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
                 test_seg_pred, test_depth_pred = multi_task_model(test_data)
                 test_loss = [compute_loss(test_seg_pred, test_label, 'semantic'),
-                             compute_loss(test_depth_pred, test_depth, 'depth')]
-
-
+                            criterion_depth(depth_pred, train_depth)]
+                
                 conf_mat.update(test_seg_pred.argmax(1).flatten(), test_label.flatten())
            
                 cost[6] = test_loss[0].item()
@@ -71,8 +87,14 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
 
             # compute mIoU and acc
             avg_cost[index, 7:9] = np.array(conf_mat.get_metrics())
+<<<<<<< Updated upstream
 
         scheduler.step()
+=======
+        
+        #scheduler.step()
+        
+>>>>>>> Stashed changes
         print('Epoch: {:04d} | TRAIN: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} ||'
             'TEST: {:.4f} {:.4f} {:.4f} | {:.4f} {:.4f} {:.4f} '
             .format(index, avg_cost[index, 0], avg_cost[index, 1], avg_cost[index, 2], avg_cost[index, 3],

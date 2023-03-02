@@ -21,6 +21,7 @@ np.random.seed(random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+<<<<<<< Updated upstream
 backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=False)
 mt_model = DenseDrive(backbone).to(device)
 
@@ -28,12 +29,26 @@ freeze_backbone = False
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
+=======
+backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=True)
+#mt_model = DenseDrive(backbone).to(device)
+mt_model = DenseDrive().to(device)
+
+# freeze_backbone = True
+# if freeze_backbone:
+#     mt_model.backbone.requires_grad_(False)
+#     print('[Info] freezed backbone')
+>>>>>>> Stashed changes
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=1e-3, weight_decay=1e-5)
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
                                         T_0 = 8, # Number of iterations for the first restart
                                         T_mult = 1, # A factor increases TiTi​ after a restart
+<<<<<<< Updated upstream
                                         eta_min = 1e-4) # Minimum learning rate
+=======
+                                        eta_min = 1e-4), # Minimum learning rate
+>>>>>>> Stashed changes
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 

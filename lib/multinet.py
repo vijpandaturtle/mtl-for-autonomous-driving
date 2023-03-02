@@ -2,28 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lib.neck import BiFPN
-from lib.heads import BiFPNDecoder, SegmentationHead, DepthHead
+from lib.blocks import inconv, down, up, outconv
 
 class DenseDrive(nn.Module):
-    def __init__(self, backbone):
+    def __init__(self):
         super(DenseDrive, self).__init__()
-
-        self.fpn_num_filters = 64
-        self.fpn_cell_repeats = 3
-        self.conv_channels = [40, 112, 320]
         self.seg_class_nb = 7
-        
-        self.backbone = backbone
-        
-        self.neck = nn.Sequential(
-            *[BiFPN(self.fpn_num_filters, self.conv_channels,
-                    True if _ == 0 else False,
-                    attention=True,
-                    use_p8=False)
-              for _ in range(self.fpn_cell_repeats)]
-        )
 
+<<<<<<< Updated upstream
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
         self.segmentation_head = SegmentationHead(
@@ -46,43 +32,39 @@ class DenseDrive(nn.Module):
         self.initialize_head(self.segmentation_head)
         self.initialize_head(self.depth_estimation_head)
         self.initialize_decoder(self.neck)
+=======
+        self.inc = inconv(3, 64)
+        self.down1 = down(64, 128)
+        self.down2 = down(128, 256)
+        self.down3 = down(256, 512)
+        self.down4 = down(512, 512)
+        self.up1 = up(1024, 256, False)
+        self.up2 = up(512, 128, False)
+        self.up3 = up(256, 64, False)
+        self.up4 = up(128, 64, False)
+        self.outc_segm = outconv(64, self.seg_class_nb)
+        self.outc_depth = outconv(64, 1)
+>>>>>>> Stashed changes
 
     def forward(self, x):
-        p2, p3, p4, p5 = self.backbone(x)[-4:]
-       
-        features = (p3, p4, p5)
-        features = self.neck(features)
-     
-        p3,p4,p5,p6,p7 = features
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2) 
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        
+        seg = self.up1(x5, x4)
+        seg = self.up2(seg, x3)
+        seg = self.up3(seg, x2)
+        seg = self.up4(seg, x1)
+        seg_out = self.outc_segm(seg)
+        seg_out = F.log_softmax(seg_out, dim=1)
 
-        outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
-
-        semantic_seg_map = self.segmentation_head(outputs)
-        depth_map = self.depth_estimation_head(outputs)
-        return semantic_seg_map, depth_map
-
-    def initialize_decoder(self, module):
-        for m in module.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_uniform_(m.weight, mode="fan_in", nonlinearity="relu")
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-            elif isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-
-    def initialize_head(self, module):
-        for m in module.modules():
-            if isinstance(m, (nn.Linear, nn.Conv2d)):
-                nn.init.xavier_uniform_(m.weight)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-
+        depth = self.up1(x5, x4)
+        depth = self.up2(depth, x3)
+        depth = self.up3(depth, x2)
+        depth = self.up4(depth, x1)
+        depth_out = self.outc_depth(depth)
+        depth_out = torch.sigmoid(depth_out) 
+        
+        return seg_out, depth_out  
