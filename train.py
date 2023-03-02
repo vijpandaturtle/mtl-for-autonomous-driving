@@ -21,7 +21,7 @@ np.random.seed(random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('efficientnet_b3', features_only=True, out_indices=(1,2,3,4), pretrained=True)
+backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
 freeze_backbone = True
@@ -30,7 +30,7 @@ if freeze_backbone:
     print('[Info] freezed backbone')
 
 optimizer = [optim.AdamW(mt_model.parameters(), lr=1e-3, weight_decay=1e-5),
-            optim.AdamW(mt_model.depth_estimation_head.parameters(), lr=1e-4, weight_decay=1e-5)]
+            optim.AdamW(mt_model.depth_estimation_head.parameters(), lr=1e-2, weight_decay=1e-5)]
 scheduler = [MultiStepLR(optimizer[1], milestones=[100,150], gamma=0.5),
             CosineAnnealingWarmRestarts(optimizer[0], 
                                         T_0 = 8, # Number of iterations for the first restart
