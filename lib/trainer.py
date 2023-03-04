@@ -1,4 +1,5 @@
 import torch
+#import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 
@@ -9,6 +10,9 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
+    #criterion_segm = nn.CrossEntopyLoss()
+    #criterion_depth = nn.MSELoss()
+
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
     
     for index in range(total_epoch):
@@ -29,7 +33,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             #print(train_loss)
-            loss_coeffs = (0.9, 0.1)
+            loss_coeffs = (0.7, 0.3)
 
             loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
            

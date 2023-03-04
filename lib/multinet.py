@@ -37,7 +37,7 @@ class DenseDrive(nn.Module):
         self.depth_estimation_head = DepthHead(
             in_channels=64,
             out_channels=1, #Depth Classes
-            activation=None,
+            activation='sigmoid',
             kernel_size=1,
             upsampling=4,
         )
@@ -76,7 +76,6 @@ class DenseDrive(nn.Module):
                 nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-
 
     def initialize_head(self, module):
         for m in module.modules():
