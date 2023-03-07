@@ -27,15 +27,21 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_data, train_label = train_data.to(device), train_label.squeeze(1).long().to(device)
             train_depth = train_depth.to(device)
          
-            seg_pred, depth_pred = multi_task_model(train_data)
+            seg_pred, depth_pred, log_vars = multi_task_model(train_data)
 
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             #print(train_loss)
-            loss_coeffs = (0.7, 0.3)
+            precision1 = torch.exp(-log_vars[0])
+            loss1 = precision1*train_loss[0] + log_vars[0]
 
-            loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
+            precision2 = torch.exp(log_vars[1])
+            loss2 = precision2*train_loss[1] + log_vars[1]
+            
+            #loss_coeffs = (0.75, 0.25)
+            #loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
+            loss = loss1 + loss2
            
             loss.backward()
             optimizer.step()
@@ -61,7 +67,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                 test_data, test_label = test_data.to(device), test_label.squeeze(1).long().to(device)
                 test_depth = test_depth.to(device)
 
-                test_seg_pred, test_depth_pred = multi_task_model(test_data)
+                test_seg_pred, test_depth_pred, _ = multi_task_model(test_data)
                 test_loss = [compute_loss(test_seg_pred, test_label, 'semantic'),
                              compute_loss(test_depth_pred, test_depth, 'depth')]
 
