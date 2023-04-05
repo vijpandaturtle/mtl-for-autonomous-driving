@@ -13,6 +13,7 @@ class DenseDrive(nn.Module):
         self.fpn_cell_repeats = 3
         self.conv_channels = [40, 112, 320]
         self.seg_class_nb = 7
+        self.log_vars = nn.Parameter(torch.zeros((2)))#2 is the number of tasks
         
         self.backbone = backbone
         
@@ -59,7 +60,7 @@ class DenseDrive(nn.Module):
 
         semantic_seg_map = self.segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
-        return semantic_seg_map, depth_map
+        return semantic_seg_map, depth_map, self.log_vars
 
     def initialize_decoder(self, module):
         for m in module.modules():

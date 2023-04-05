@@ -1,5 +1,5 @@
+import wandb
 import torch
-#import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
 
@@ -7,12 +7,14 @@ from lib.utils import ConfMatrix, depth_error
 from lib.utils import compute_loss
 
 def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch):
+    wandb.init(
+    # set the wandb project where this run will be logged
+    project="densedrive"
+    )
+
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
-    #criterion_segm = nn.CrossEntopyLoss()
-    #criterion_depth = nn.MSELoss()
-
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
     
     for index in range(total_epoch):
@@ -88,3 +90,8 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             .format(index, avg_cost[index, 0], avg_cost[index, 1], avg_cost[index, 2], avg_cost[index, 3],
                     avg_cost[index, 4], avg_cost[index, 5], avg_cost[index, 6], avg_cost[index, 7], avg_cost[index, 8],
                     avg_cost[index, 9], avg_cost[index, 10], avg_cost[index, 11]))
+        
+        wandb.log({'epoch': index, 'semantic_loss': avg_cost[index, 0], 'mIoU':avg_cost[index, 1], 'pix_acc':avg_cost[index, 2], 
+                    'depth_loss': avg_cost[index, 3], 'abs_error': avg_cost[index, 4], 'rel_err':avg_cost[index, 5], 
+                    'val_sem_loss' : avg_cost[index, 6], 'val_mIoU':avg_cost[index, 7], 'val_pix_acc':avg_cost[index, 8],
+                    'val_depth_loss':avg_cost[index, 9], 'val_abs_err':avg_cost[index, 10], 'val_rel_err':avg_cost[index, 11]})

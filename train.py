@@ -21,7 +21,7 @@ np.random.seed(random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('efficientnet_b2', features_only=True, out_indices=(1,2,3,4), pretrained=True)
+backbone = timm.create_model('efficientnet_b0', features_only=True, out_indices=(1,2,3,4), pretrained=True)
 mt_model = DenseDrive(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=9e-4, weight_decay=1e-6)
