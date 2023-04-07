@@ -6,10 +6,10 @@ class BiFPNDecoder(nn.Module):
     def __init__(
             self,
             encoder_depth=5,
-            pyramid_channels=64,
-            segmentation_channels=64,
+            pyramid_channels=128,
+            segmentation_channels=128,
             dropout=0.1,
-            merge_policy="add", ):
+            merge_policy="add",):
         super().__init__()
 
         self.seg_blocks = nn.ModuleList([
@@ -17,7 +17,7 @@ class BiFPNDecoder(nn.Module):
             for n_upsamples in [5, 4, 3, 2, 1]
         ])
         
-        self.seg_p2 = SegmentationBlock(24, 64, n_upsamples=0)
+        self.seg_p2 = SegmentationBlock(32, 128, n_upsamples=0)
         self.merge = MergeBlock(merge_policy)
         self.dropout = nn.Dropout2d(p=dropout, inplace=True)
 

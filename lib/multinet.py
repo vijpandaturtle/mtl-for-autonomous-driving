@@ -9,11 +9,10 @@ class DenseDrive(nn.Module):
     def __init__(self, backbone):
         super(DenseDrive, self).__init__()
 
-        self.fpn_num_filters = 64
-        self.fpn_cell_repeats = 3
-        self.conv_channels = [40, 112, 320]
+        self.fpn_num_filters = 224
+        self.fpn_cell_repeats = 7
+        self.conv_channels = [56, 160, 448]
         self.seg_class_nb = 7
-        self.log_vars = nn.Parameter(torch.zeros((2)))#2 is the number of tasks
         
         self.backbone = backbone
         
@@ -28,7 +27,7 @@ class DenseDrive(nn.Module):
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
         self.segmentation_head = SegmentationHead(
-            in_channels=64,
+            in_channels=128,
             out_channels=self.seg_class_nb, #Semantic Segmentation Classes
             activation='logsoftmax',
             kernel_size=1,
@@ -36,7 +35,7 @@ class DenseDrive(nn.Module):
         )
 
         self.depth_estimation_head = DepthHead(
-            in_channels=64,
+            in_channels=128,
             out_channels=1, #Depth Classes
             activation='sigmoid',
             kernel_size=1,
@@ -60,7 +59,7 @@ class DenseDrive(nn.Module):
 
         semantic_seg_map = self.segmentation_head(outputs)
         depth_map = self.depth_estimation_head(outputs)
-        return semantic_seg_map, depth_map, self.log_vars
+        return semantic_seg_map, depth_map
 
     def initialize_decoder(self, module):
         for m in module.modules():
