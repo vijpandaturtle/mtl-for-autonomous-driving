@@ -24,8 +24,8 @@ config.lr_weight_decay = 1e-6
 config.epochs = 400
 config.train_batch_size = 4
 config.val_batch_size = 4
-config.t_0 = 8
-config.t_mult = 1
+config.t_0 = 30
+config.t_mult = 2
 config.eta_min = 1e-4
 
 ##############################
