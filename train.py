@@ -22,8 +22,11 @@ config.backbone_name = 'efficientnet_b4'
 config.lr = 9e-4
 config.lr_weight_decay = 1e-6
 config.epochs = 400
-config.train_batch_size = 8
-config.val_batch_size = 16
+config.train_batch_size = 4
+config.val_batch_size = 4
+config.t_0 = 8
+config.t_mult = 1
+config.eta_min = 1e-4
 
 ##############################
 torch.manual_seed(config.random_seed)
@@ -39,16 +42,16 @@ mt_model = DenseDrive(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
-                                        T_0 = 8, # Number of iterations for the first restart
-                                        T_mult = 1, # A factor increases TiTi​ after a restart
-                                        eta_min = 1e-4) # Minimum learning rate
+                                        T_0 = config.t_0, # Number of iterations for the first restart
+                                        T_mult = config.t_mult, # A factor increases TiTi​ after a restart
+                                        eta_min = config.eta_min) # Minimum learning rate
 
 freeze_backbone = True
 if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-for param in mt_model.backbone.blocks[-2:].parameters():
+for param in mt_model.backbone.blocks[-3:].parameters():
     param.requires_grad = True
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
