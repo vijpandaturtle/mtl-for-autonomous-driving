@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
+import torch.nn.functional as F
 
 from lib.utils import ConfMatrix, depth_error
 from lib.utils import compute_loss
@@ -31,7 +32,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')]
             
-            loss_coeffs = (0.75, 0.25)
+            loss_coeffs = F.softmax(torch.randn(2), dim=-1)
             loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
            
             loss.backward()

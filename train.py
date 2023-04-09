@@ -21,12 +21,12 @@ config.random_seed =  54321 # or any of your favorite number
 config.backbone_name = 'efficientnet_b4'
 config.lr = 9e-4
 config.lr_weight_decay = 1e-6
-config.epochs = 400
+config.epochs = 100
 config.train_batch_size = 4
 config.val_batch_size = 4
 config.t_0 = 30
 config.t_mult = 2
-config.eta_min = 1e-4
+config.eta_min = 1e-5
 
 ##############################
 torch.manual_seed(config.random_seed)
@@ -51,7 +51,7 @@ if freeze_backbone:
     mt_model.backbone.requires_grad_(False)
     print('[Info] freezed backbone')
 
-for param in mt_model.backbone.blocks[-3:].parameters():
+for param in mt_model.backbone.blocks[-4:].parameters():
     param.requires_grad = True
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
@@ -81,7 +81,7 @@ full_model_path = dataset_path + '/densedrive_efficientnet_b0_checkpoint.pt'
 torch.save(mt_model, model_path)
 state = {
     'epoch': config.epochs,
-    'state_dict': model.state_dict(),
+    'state_dict': mt_model.state_dict(),
     'optimizer': optimizer.state_dict(),
 }
 torch.save(state, full_model_path)
