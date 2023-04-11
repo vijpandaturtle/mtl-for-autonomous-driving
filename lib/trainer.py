@@ -26,13 +26,18 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_data, train_label = train_data.to(device), train_label.squeeze(1).long().to(device)
             train_depth = train_depth.to(device)
 
-            seg_pred, depth_pred = multi_task_model(train_data)
+            seg_pred, depth_pred, loss_vector = multi_task_model(train_data)
 
             optimizer.zero_grad()
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
-                          compute_loss(depth_pred, train_depth, 'depth')]
+                          compute_loss(depth_pred, train_depth, 'depth')] #(2,1)
             
-            loss_coeffs = F.softmax(torch.randn(2), dim=-1)
+            #Batch adaptive Loss weighting scheme
+            train_loss_torch = torch.FloatTensor(train_loss).unsqueeze(axis=1).to(device)
+            loss_vector = loss_vector.to(device) #(4,14336)
+            loss_weighting_matrix = torch.rand((len(loss_vector[1]), 2), requires_grad=True).to(device) #(14336,2)
+            loss_coeffs = F.softmax(torch.matmul(loss_vector, loss_weighting_matrix).mean(axis=0)).unsqueeze(axis=1) #(4,2) 
+            loss_coeffs = F.softmax(torch.mul(loss_coeffs, train_loss_torch).squeeze(axis=1)) #(2,1)
             loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
            
             loss.backward()
@@ -60,10 +65,11 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                 test_data, test_label = test_data.to(device), test_label.squeeze(1).long().to(device)
                 test_depth = test_depth.to(device)
 
-                test_seg_pred, test_depth_pred = multi_task_model(test_data)
+                test_seg_pred, test_depth_pred, _ = multi_task_model(test_data)
                 test_loss = [compute_loss(test_seg_pred, test_label, 'semantic'),
                              compute_loss(test_depth_pred, test_depth, 'depth')]
 
+                scheduler.step(index + k/test_batch)
 
                 conf_mat.update(test_seg_pred.argmax(1).flatten(), test_label.flatten())
            
