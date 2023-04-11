@@ -13,8 +13,9 @@ class DenseDrive(nn.Module):
         self.fpn_cell_repeats = 7
         self.conv_channels = [56, 160, 448]
         self.seg_class_nb = 7
-        
+      
         self.backbone = backbone
+        self.flatten = nn.Flatten()
         
         self.neck = nn.Sequential(
             *[BiFPN(self.fpn_num_filters, self.conv_channels,
@@ -49,17 +50,20 @@ class DenseDrive(nn.Module):
 
     def forward(self, x):
         p2, p3, p4, p5 = self.backbone(x)[-4:]
-       
+        
+        loss_vector = self.flatten(p5)
+        
         features = (p3, p4, p5)
         features = self.neck(features)
      
         p3,p4,p5,p6,p7 = features
 
-        outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
+        seg_outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
+        depth_outputs = self.bifpndecoder((p2,p3,p4,p5,p6,p7))
 
-        semantic_seg_map = self.segmentation_head(outputs)
-        depth_map = self.depth_estimation_head(outputs)
-        return semantic_seg_map, depth_map
+        semantic_seg_map = self.segmentation_head(seg_outputs)
+        depth_map = self.depth_estimation_head(depth_outputs)
+        return semantic_seg_map, depth_map, loss_vector
 
     def initialize_decoder(self, module):
         for m in module.modules():
