@@ -19,9 +19,9 @@ wandb.init(project="densedrive")
 config = wandb.config
 config.random_seed =  54321 # or any of your favorite number 
 config.backbone_name = 'efficientnet_b4'
-config.lr = 9e-4
+config.lr = 1e-3
 config.lr_weight_decay = 1e-6
-config.epochs = 100
+config.epochs = 200
 config.train_batch_size = 4
 config.val_batch_size = 4
 config.t_0 = 30
@@ -46,13 +46,13 @@ scheduler = CosineAnnealingWarmRestarts(optimizer,
                                         T_mult = config.t_mult, # A factor increases TiTi​ after a restart
                                         eta_min = config.eta_min) # Minimum learning rate
 
-freeze_backbone = True
-if freeze_backbone:
-    mt_model.backbone.requires_grad_(False)
-    print('[Info] freezed backbone')
+# freeze_backbone = True
+# if freeze_backbone:
+#     mt_model.backbone.requires_grad_(False)
+#     print('[Info] freezed backbone')
 
-for param in mt_model.backbone.blocks[-4:].parameters():
-    param.requires_grad = True
+# for param in mt_model.backbone.blocks[-5:].parameters():
+#     param.requires_grad = True
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
@@ -75,8 +75,8 @@ test_loader = torch.utils.data.DataLoader(
 multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs)
 
 #####################################
-model_path = dataset_path + '/densedrive_efficientnet_b0_final.pt'
-full_model_path = dataset_path + '/densedrive_efficientnet_b0_checkpoint.pt'
+model_path = dataset_path + '/densedrive_efficientnet_b4_final.pt'
+full_model_path = dataset_path + '/densedrive_efficientnet_b4_checkpoint.pt'
 #torch.save(the_model.state_dict(), PATH)
 torch.save(mt_model, model_path)
 state = {
