@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from lib.neck import BiFPN
 from lib.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
-class DenseDrive(nn.Module):
+class EfficientMTL(nn.Module):
     def __init__(self, backbone):
         super(DenseDrive, self).__init__()
 

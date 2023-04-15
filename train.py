@@ -10,11 +10,11 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data.dataset import Dataset
 
 from lib.dataset import CityScapes, RandomScaleCrop
-from lib.multinet import DenseDrive
+from lib.multinet import EfficientMTL
 from lib.trainer import multi_task_trainer
 
 ##############################
-wandb.init(project="densedrive")
+wandb.init(project="efficientmtl")
 
 config = wandb.config
 config.random_seed =  54321 # or any of your favorite number 
@@ -38,7 +38,7 @@ np.random.seed(config.random_seed)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 backbone = timm.create_model('efficientnet_b4', features_only=True, out_indices=(1,2,3,4), pretrained=True)
-mt_model = DenseDrive(backbone).to(device)
+mt_model = EfficientMTL(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
@@ -75,8 +75,8 @@ test_loader = torch.utils.data.DataLoader(
 multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs)
 
 #####################################
-model_path = dataset_path + '/densedrive_efficientnet_b4_final.pt'
-full_model_path = dataset_path + '/densedrive_efficientnet_b4_checkpoint.pt'
+model_path = dataset_path + '/efficientmtl_weights.pt'
+full_model_path = dataset_path + '/efficientmtl_checkpoint.pt'
 #torch.save(the_model.state_dict(), PATH)
 torch.save(mt_model, model_path)
 state = {
