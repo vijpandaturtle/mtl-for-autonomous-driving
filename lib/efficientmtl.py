@@ -7,7 +7,7 @@ from lib.heads import BiFPNDecoder, SegmentationHead, DepthHead
 
 class EfficientMTL(nn.Module):
     def __init__(self, backbone):
-        super(DenseDrive, self).__init__()
+        super(EfficientMTL, self).__init__()
 
         self.fpn_num_filters = 224
         self.fpn_cell_repeats = 7

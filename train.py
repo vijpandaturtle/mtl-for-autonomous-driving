@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR
 from torch.utils.data.dataset import Dataset
 
 from lib.dataset import CityScapes, RandomScaleCrop
-from lib.multinet import EfficientMTL
+from lib.efficientmtl import EfficientMTL
 from lib.trainer import multi_task_trainer
 
 ##############################
@@ -27,6 +27,7 @@ config.val_batch_size = 4
 config.t_0 = 30
 config.t_mult = 2
 config.eta_min = 1e-5
+config.t_max = 100
 
 ##############################
 torch.manual_seed(config.random_seed)
@@ -41,10 +42,12 @@ backbone = timm.create_model('efficientnet_b4', features_only=True, out_indices=
 mt_model = EfficientMTL(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
-scheduler = CosineAnnealingWarmRestarts(optimizer, 
-                                        T_0 = config.t_0, # Number of iterations for the first restart
-                                        T_mult = config.t_mult, # A factor increases TiTi​ after a restart
-                                        eta_min = config.eta_min) # Minimum learning rate
+scheduler = CosineAnnealingLR(optimizer, T_max=config.t_max, eta_min = config.eta_min)
+
+# CosineAnnealingWarmRestarts(optimizer, 
+#                             T_0 = config.t_0, # Number of iterations for the first restart
+#                             T_mult = config.t_mult, # A factor increases TiTi​ after a restart
+#                             eta_min = config.eta_min) # Minimum learning rate
 
 # freeze_backbone = True
 # if freeze_backbone:
@@ -85,3 +88,7 @@ state = {
     'optimizer': optimizer.state_dict(),
 }
 torch.save(state, full_model_path)
+
+art = wandb.Artifact("efficientmtl", type="model")
+art.add_file("efficientmtl_weights.pt")
+wandb.log_artifact(art)

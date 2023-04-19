@@ -33,16 +33,18 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                           compute_loss(depth_pred, train_depth, 'depth')] #(2,1)
             
             #Batch adaptive Loss weighting scheme
-            train_loss_torch = torch.FloatTensor(train_loss).unsqueeze(axis=1).to(device)
-            loss_vector = loss_vector.to(device) #(4,14336)
-            loss_weighting_matrix = torch.rand((len(loss_vector[1]), 2), requires_grad=True).to(device) #(14336,2)
-            loss_coeffs = F.softmax(torch.matmul(loss_vector, loss_weighting_matrix).mean(axis=0)).unsqueeze(axis=1) #(4,2) 
-            loss_coeffs = F.softmax(torch.mul(loss_coeffs, train_loss_torch).squeeze(axis=1)) #(2,1)
-            loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
+            # train_loss_torch = torch.FloatTensor(train_loss).unsqueeze(axis=1).to(device)
+            # loss_vector = loss_vector.to(device) #(4,14336)
+            # loss_weighting_matrix = torch.rand((len(loss_vector[1]), 2), requires_grad=True).to(device) #(14336,2)
+            # loss_coeffs = F.softmax(torch.matmul(loss_vector, loss_weighting_matrix).mean(axis=0)).unsqueeze(axis=1) #(4,2) 
+            # loss_coeffs = F.softmax(torch.mul(loss_coeffs, train_loss_torch).squeeze(axis=1)) #(2,1)
+            loss = (train_loss[1]/train_loss[0])*train_loss[0] + (1-(train_loss[1]/train_loss[0]))*train_loss[1]
+
+            #wandb.log({'alpha':loss_coeffs[0], 'beta':loss_coeffs[1]})
            
             loss.backward()
             optimizer.step()
-            scheduler.step(index + k/train_batch)
+            #scheduler.step(index + k/train_batch)
            
             # accumulate label prediction for every pixel in training images
             conf_mat.update(seg_pred.argmax(1).flatten(), train_label.flatten())
