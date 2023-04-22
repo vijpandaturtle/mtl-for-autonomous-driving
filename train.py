@@ -18,15 +18,15 @@ wandb.init(project="efficientmtl")
 
 config = wandb.config
 config.random_seed =  54321 # or any of your favorite number 
-config.backbone_name = 'efficientnet_b4'
-config.lr = 1e-3
+config.backbone_name = 'convnext_tiny'
+config.lr = 1e-4
 config.lr_weight_decay = 1e-6
 config.epochs = 200
 config.train_batch_size = 4
 config.val_batch_size = 4
 config.t_0 = 30
 config.t_mult = 2
-config.eta_min = 1e-5
+config.eta_min = 1e-7
 config.t_max = 100
 
 ##############################
@@ -38,16 +38,16 @@ np.random.seed(config.random_seed)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-backbone = timm.create_model('efficientnet_b4', features_only=True, out_indices=(1,2,3,4), pretrained=True)
+backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0,1,2,3), pretrained=True)
 mt_model = EfficientMTL(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
-scheduler = CosineAnnealingLR(optimizer, T_max=config.t_max, eta_min = config.eta_min)
+#scheduler = CosineAnnealingLR(optimizer, T_max=config.t_max, eta_min = config.eta_min)
 
-# CosineAnnealingWarmRestarts(optimizer, 
-#                             T_0 = config.t_0, # Number of iterations for the first restart
-#                             T_mult = config.t_mult, # A factor increases TiTi​ after a restart
-#                             eta_min = config.eta_min) # Minimum learning rate
+scheduler = CosineAnnealingWarmRestarts(optimizer, 
+                            T_0 = config.t_0, # Number of iterations for the first restart
+                            T_mult = config.t_mult, # A factor increases TiTi​ after a restart
+                            eta_min = config.eta_min) # Minimum learning rate
 
 # freeze_backbone = True
 # if freeze_backbone:
