@@ -18,16 +18,33 @@ wandb.init(project="efficientmtl")
 
 config = wandb.config
 config.random_seed =  54321 # or any of your favorite number 
-config.backbone_name = 'convnext_tiny'
-config.lr = 1e-4
+config.lr = 1e-3
 config.lr_weight_decay = 1e-6
 config.epochs = 200
 config.train_batch_size = 4
 config.val_batch_size = 4
 config.t_0 = 30
 config.t_mult = 2
-config.eta_min = 1e-7
+config.eta_min = 1e-5
 config.t_max = 100
+config.alpha = 0.25
+config.beta = 0.75
+
+sweep_configuration = {
+    'method': 'grid',
+    'name': 'sweep',
+    'metric': {
+        'goal': 'minimize', 
+        'name': 'total_loss'
+        },
+    'parameters': {
+        'train_batch_size': {'values': [2, 4, 8, 16, 32, 64]},
+        'val_batch_size': {'values': [2, 4, 8, 16, 32, 64]},
+        'lr': {'max': 0.01, 'min': 0.00001}, 
+        'alpha' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]},
+        'beta' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]}
+     }
+}
 
 ##############################
 torch.manual_seed(config.random_seed)
@@ -42,7 +59,6 @@ backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0
 mt_model = EfficientMTL(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
-#scheduler = CosineAnnealingLR(optimizer, T_max=config.t_max, eta_min = config.eta_min)
 
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
                             T_0 = config.t_0, # Number of iterations for the first restart
@@ -75,7 +91,11 @@ test_loader = torch.utils.data.DataLoader(
               drop_last=True,
               shuffle=False)
 
-multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs)
+multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs, config.alpha, config.beta)
+
+sweep_id = wandb.sweep(sweep=sweep_configuration, project="project-name")
+#sweep_id, count = "dtzl1o7u", 10
+wandb.agent(sweep_id)#, count=count)
 
 #####################################
 model_path = dataset_path + '/efficientmtl_weights.pt'

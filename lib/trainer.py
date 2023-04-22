@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from lib.utils import ConfMatrix, depth_error
 from lib.utils import compute_loss
 
-def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch):
+def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch, alpha, beta):
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
@@ -32,21 +32,10 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
             train_loss = [compute_loss(seg_pred, train_label, 'semantic'),
                           compute_loss(depth_pred, train_depth, 'depth')] #(2,1)
             
-            ### Batch adaptive Loss weighting scheme ###
-            train_loss_torch = torch.FloatTensor(train_loss).unsqueeze(axis=1).to(device)
-            loss_vector = loss_vector.to(device) #(4,14336)
+            #Loss Weighting
+            loss = alpha*train_loss[0] + beta*train_loss[1]
 
-            m1 = torch.nn.Parameter(torch.rand((len(loss_vector[1]), 2), requires_grad=True)).to(device) #(14336,2)
-            m2 = torch.nn.Parameter(torch.rand((4, 1), requires_grad=True)).to(device) #(4,1)
-
-            c1 = torch.transpose(torch.matmul(loss_vector, m1), 0, 1)
-            c2 = torch.matmul(c1, m2)
-            loss_coeffs = F.sigmoid(c2)
-            loss_coeffs =  F.softmax(torch.mul(loss_coeffs, train_loss_torch), dim=0) #(2,1)
-            #############################################
-            loss = loss_coeffs[0]*train_loss[0] + loss_coeffs[1]*train_loss[1]
-
-            wandb.log({'alpha':loss_coeffs[0], 'beta':loss_coeffs[1]})
+            wandb.log({'total_loss':loss})
            
             loss.backward()
             optimizer.step()
