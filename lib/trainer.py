@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from lib.utils import ConfMatrix, depth_error
 from lib.utils import compute_loss
 
-def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch, alpha, beta):
+def multi_task_trainer(train_loader, test_loader, multi_task_model, device, optimizer, scheduler, total_epoch, alpha, beta):    
     train_batch = len(train_loader)
     test_batch = len(test_loader)
     
