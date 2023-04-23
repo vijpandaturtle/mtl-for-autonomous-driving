@@ -43,7 +43,7 @@ class CityScapes(Dataset):
     def __getitem__(self, index):
         # load data from the pre-processed npy files
         image = torch.from_numpy(np.moveaxis(np.load(self.data_path + '/image/{:d}.npy'.format(index)), -1, 0)).float()
-        semantic = torch.from_numpy(np.load(self.data_path + '/label/{:d}.npy'.format(index))).float()
+        semantic = torch.from_numpy(np.load(self.data_path + '/label_19/{:d}.npy'.format(index))).float()
         depth = torch.from_numpy(np.moveaxis(np.load(self.data_path + '/depth/{:d}.npy'.format(index)), -1, 0)).float()
 
         if self.transform is not None:

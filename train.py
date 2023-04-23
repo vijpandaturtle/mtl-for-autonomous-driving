@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch.utils.data.dataset import Dataset
 
 from lib.dataset import CityScapes, RandomScaleCrop
@@ -14,33 +14,29 @@ from lib.efficientmtl import EfficientMTL
 from lib.trainer import multi_task_trainer
 
 ##############################
-wandb.init(project="efficientmtl")
+wandb.init(project="convmtl")
 
 config = wandb.config
 config.random_seed =  54321 # or any of your favorite number 
 config.lr = 1e-3
 config.lr_weight_decay = 1e-6
-config.epochs = 200
+config.epochs = 100
 config.train_batch_size = 4
 config.val_batch_size = 4
-config.t_0 = 30
-config.t_mult = 2
-config.eta_min = 1e-5
-config.t_max = 100
 config.alpha = 0.25
 config.beta = 0.75
+config.t_0 = 50
+config.t_mult = 1
+config.eta_min = 1e-6
 
 sweep_configuration = {
-    'method': 'grid',
+    'method': 'bayesian',
     'name': 'sweep',
     'metric': {
         'goal': 'minimize', 
         'name': 'total_loss'
         },
     'parameters': {
-        'train_batch_size': {'values': [2, 4, 8, 16, 32, 64]},
-        'val_batch_size': {'values': [2, 4, 8, 16, 32, 64]},
-        'lr': {'max': 0.01, 'min': 0.00001}, 
         'alpha' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]},
         'beta' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]}
      }
@@ -59,19 +55,18 @@ backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0
 mt_model = EfficientMTL(backbone).to(device)
 
 optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
-
 scheduler = CosineAnnealingWarmRestarts(optimizer, 
                             T_0 = config.t_0, # Number of iterations for the first restart
                             T_mult = config.t_mult, # A factor increases TiTi​ after a restart
                             eta_min = config.eta_min) # Minimum learning rate
 
-# freeze_backbone = True
-# if freeze_backbone:
-#     mt_model.backbone.requires_grad_(False)
-#     print('[Info] freezed backbone')
+freeze_backbone = True
+if freeze_backbone:
+    mt_model.backbone.requires_grad_(False)
+    print('[Info] freezed backbone')
 
-# for param in mt_model.backbone.blocks[-5:].parameters():
-#     param.requires_grad = True
+for param in mt_model.backbone['stages_3'].parameters():
+    param.requires_grad = True
 
 print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
@@ -93,9 +88,9 @@ test_loader = torch.utils.data.DataLoader(
 
 multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs, config.alpha, config.beta)
 
-sweep_id = wandb.sweep(sweep=sweep_configuration, project="project-name")
-#sweep_id, count = "dtzl1o7u", 10
-wandb.agent(sweep_id)#, count=count)
+# sweep_id = wandb.sweep(sweep=sweep_configuration, function=multi_task_trainer, project="convmtl")
+# count = 10
+# wandb.agent(sweep_id, count=count)
 
 #####################################
 model_path = dataset_path + '/efficientmtl_weights.pt'

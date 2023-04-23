@@ -12,7 +12,7 @@ class EfficientMTL(nn.Module):
         self.fpn_num_filters = 288
         self.fpn_cell_repeats = 7
         self.conv_channels = [192, 384, 768]
-        self.seg_class_nb = 7
+        self.seg_class_nb = 19
       
         self.backbone = backbone
         self.flatten = nn.Flatten()

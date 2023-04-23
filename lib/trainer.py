@@ -39,7 +39,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
            
             loss.backward()
             optimizer.step()
-            scheduler.step(index + k/train_batch)
            
             # accumulate label prediction for every pixel in training images
             conf_mat.update(seg_pred.argmax(1).flatten(), train_label.flatten())
@@ -67,7 +66,7 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                              compute_loss(test_depth_pred, test_depth, 'depth')]
 
                 scheduler.step(index + k/test_batch)
-
+ 
                 conf_mat.update(test_seg_pred.argmax(1).flatten(), test_label.flatten())
            
                 cost[6] = test_loss[0].item()
