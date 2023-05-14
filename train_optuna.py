@@ -1,0 +1,105 @@
+import wandb
+import timm
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+import torch
+import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.utils.data.dataset import Dataset
+
+from lib.dataset import CityScapes, RandomScaleCrop
+from lib.efficientmtl import EfficientMTL
+from lib.trainer import multi_task_trainer
+
+import optuna
+
+def objective(trial):
+    wandb.init(project="convmtl-search")
+
+    params = {
+        'alpha' : trial.suggest_categorical('alpha', [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]),
+        'beta' : trial.suggest_categorical('alpha', [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]),
+    }
+
+    config = wandb.config
+    config.random_seed =  54321 # or any of your favorite number 
+    config.lr = 1e-3
+    config.lr_weight_decay = 1e-6
+    config.epochs = 50
+    config.train_batch_size = 4
+    config.val_batch_size = 4
+    config.t_0 = 50
+    config.t_mult = 1
+    config.eta_min = 1e-6
+
+    torch.manual_seed(config.random_seed)
+    torch.cuda.manual_seed(config.random_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(config.random_seed)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    backbone = timm.create_model('convnext_tiny', features_only=True, out_indices=(0,1,2,3), pretrained=True)
+    mt_model = EfficientMTL(backbone).to(device)
+
+    optimizer = optim.AdamW(mt_model.parameters(), lr=config.lr, weight_decay=config.lr_weight_decay)
+    scheduler = CosineAnnealingWarmRestarts(optimizer, 
+                                T_0 = config.t_0, # Number of iterations for the first restart
+                                T_mult = config.t_mult, # A factor increases TiTi​ after a restart
+                                eta_min = config.eta_min) # Minimum learning rate
+
+    freeze_backbone = True
+    if freeze_backbone:
+        mt_model.backbone.requires_grad_(False)
+        print('[Info] freezed backbone')
+
+    for param in mt_model.backbone['stages_3'].parameters():
+        param.requires_grad = True
+
+    print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
+
+    dataset_path = 'cityscapes_processed'
+    train_set = CityScapes(root=dataset_path, train=True, transforms=RandomScaleCrop(), random_flip=False)
+    test_set = CityScapes(root=dataset_path, train=False)
+
+    train_loader = torch.utils.data.DataLoader(
+               dataset=train_set,
+               batch_size=config.train_batch_size,
+               drop_last=True, #difference in no of samples in last batch
+               shuffle=True)
+
+    test_loader = torch.utils.data.DataLoader(
+                dataset=test_set,
+                batch_size=config.val_batch_size,
+                drop_last=True,
+                shuffle=False)
+    
+    val_rel_err = multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs, params['alpha'], params['beta'])
+
+    model_path = dataset_path + '/efficientmtl_weights.pt'
+    full_model_path = dataset_path + '/efficientmtl_checkpoint.pt'
+    #torch.save(the_model.state_dict(), PATH)
+    torch.save(mt_model, model_path)
+    state = {
+        'epoch': config.epochs,
+        'state_dict': mt_model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+    }
+    torch.save(state, full_model_path)
+
+    art = wandb.Artifact("efficientmtl", type="model")
+    art.add_file("efficientmtl_weights.pt")
+    wandb.log_artifact(art)
+
+
+sampler = optuna.samplers.TPESampler()    
+study = optuna.create_study(
+    sampler=sampler,
+    pruner=optuna.pruners.MedianPruner(
+        n_startup_trials=2, n_warmup_steps=5, interval_steps=3
+    ),
+    direction='minimize')
+study.optimize(func=objective, n_trials=40)

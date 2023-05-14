@@ -22,7 +22,6 @@ sweep_configuration = {
         },
     'parameters': {
         'alpha' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]},
-        'beta' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]}
      }
 }
 
@@ -33,11 +32,11 @@ def main():
     config.random_seed =  54321 # or any of your favorite number 
     config.lr = 1e-3
     config.lr_weight_decay = 1e-6
-    config.epochs = 40
+    config.epochs = 100
     config.train_batch_size = 4
     config.val_batch_size = 4
     config.alpha = 0.25
-    config.beta = 0.75
+    config.beta = 1-config.alpha
     config.t_0 = 50
     config.t_mult = 1
     config.eta_min = 1e-6
