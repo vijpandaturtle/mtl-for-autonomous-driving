@@ -3,13 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from lib.neck import BiFPN
-from lib.heads import BiFPNDecoder, SegmentationHead, DepthHead
+from lib.heads import BiFPNDecoder, DeepLabV3Head
 
 class EfficientMTL(nn.Module):
     def __init__(self, backbone):
         super(EfficientMTL, self).__init__()
 
-        self.fpn_num_filters = 288
+        self.fpn_num_filters = 224
         self.fpn_cell_repeats = 7
         self.conv_channels = [192, 384, 768]
         self.seg_class_nb = 7
@@ -27,21 +27,23 @@ class EfficientMTL(nn.Module):
 
         self.bifpndecoder = BiFPNDecoder(pyramid_channels=self.fpn_num_filters)
        
-        self.segmentation_head = SegmentationHead(
-            in_channels=128,
-            out_channels=self.seg_class_nb, #Semantic Segmentation Classes
-            activation='logsoftmax',
-            kernel_size=1,
-            upsampling=4,
-        )
+        self.segmentation_head = DeepLabV3Head(in_channels=128, out_channels=self.seg_class_nb, activation='logsoftmax')
+        # SegmentationHead(
+        #     in_channels=128,
+        #     out_channels=self.seg_class_nb, #Semantic Segmentation Classes
+        #     activation='logsoftmax',
+        #     kernel_size=1,
+        #     upsampling=4,
+        # )
 
-        self.depth_estimation_head = DepthHead(
-            in_channels=128,
-            out_channels=1, #Depth Classes
-            activation='sigmoid',
-            kernel_size=1,
-            upsampling=4,
-        )
+        self.depth_estimation_head = DeepLabV3Head(in_channels=128, out_channels=1, activation='sigmoid')
+        # DepthHead(
+        #     in_channels=128,
+        #     out_channels=1, #Depth Classes
+        #     activation='sigmoid',
+        #     kernel_size=1,
+        #     upsampling=4,
+        # )
 
         self.initialize_decoder(self.bifpndecoder)
         self.initialize_head(self.segmentation_head)

@@ -21,7 +21,7 @@ sweep_configuration = {
         'name': 'total_loss'
         },
     'parameters': {
-        'alpha' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]},
+        'alpha' : {'values':[0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]},
      }
 }
 
@@ -32,7 +32,7 @@ def main():
     config.random_seed =  54321 # or any of your favorite number 
     config.lr = 1e-3
     config.lr_weight_decay = 1e-6
-    config.epochs = 100
+    config.epochs = 50
     config.train_batch_size = 4
     config.val_batch_size = 4
     config.alpha = 0.25
@@ -63,8 +63,8 @@ def main():
         mt_model.backbone.requires_grad_(False)
         print('[Info] freezed backbone')
 
-    for param in mt_model.backbone['stages_3'].parameters():
-        param.requires_grad = True
+    # for param in mt_model.backbone['stages_3'].parameters():
+    #     param.requires_grad = True
 
     print('LOSS FORMAT: SEMANTIC_LOSS MEAN_IOU PIX_ACC | DEPTH_LOSS ABS_ERR REL_ERR <11.25 <22.5')
 
@@ -86,22 +86,38 @@ def main():
     
     multi_task_trainer(train_loader, test_loader, mt_model, device, optimizer, scheduler, config.epochs, config.alpha, config.beta)
 
-    model_path = dataset_path + '/efficientmtl_weights.pt'
-    full_model_path = dataset_path + '/efficientmtl_checkpoint.pt'
-    #torch.save(the_model.state_dict(), PATH)
-    torch.save(mt_model, model_path)
-    state = {
-        'epoch': config.epochs,
-        'state_dict': mt_model.state_dict(),
-        'optimizer': optimizer.state_dict(),
-    }
-    torch.save(state, full_model_path)
+    # model_path = dataset_path + '/efficientmtl_weights.pt'
+    # full_model_path = dataset_path + '/efficientmtl_checkpoint.pt'
+    # #torch.save(the_model.state_dict(), PATH)
+    # torch.save(mt_model, model_path)
+    # state = {
+    #     'epoch': config.epochs,
+    #     'state_dict': mt_model.state_dict(),
+    #     'optimizer': optimizer.state_dict(),
+    # }
+    # torch.save(state, full_model_path)
 
-    art = wandb.Artifact("efficientmtl", type="model")
-    art.add_file("efficientmtl_weights.pt")
-    wandb.log_artifact(art)
+    # art = wandb.Artifact("efficientmtl", type="model")
+    # art.add_file("efficientmtl_weights.pt")
+    # wandb.log_artifact(art)
 
 
 sweep_id = wandb.sweep(sweep=sweep_configuration, project="convmtl-search")
 count = 10
 wandb.agent(sweep_id=sweep_id, function=main, count=count)
+#main()
+
+#Reimporting SSL ResNet for multitask learning
+# import pathlib
+# from timm.models.resnet import default_cfgs
+# model_name = "resnet50"
+# checkpoint_path = "model.pth"
+# checkpoint_path_url = pathlib.Path(checkpoint_path).resolve().as_uri()
+
+# default_cfgs["url"] = checkpoint_path_url
+
+# model = timm.create_model(
+#     model_name,
+#     features_only=True,
+#     out_indices=(1,2,3,4)
+# )

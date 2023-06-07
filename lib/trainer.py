@@ -13,7 +13,6 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
     test_batch = len(test_loader)
     
     avg_cost = np.zeros([total_epoch, 12], dtype=np.float32)
-    loss = global None
 
     for index in range(total_epoch):
         cost = np.zeros(12, dtype=np.float32)
@@ -88,5 +87,3 @@ def multi_task_trainer(train_loader, test_loader, multi_task_model, device, opti
                     'depth_loss': avg_cost[index, 3], 'abs_error': avg_cost[index, 4], 'rel_err':avg_cost[index, 5], 
                     'val_sem_loss' : avg_cost[index, 6], 'val_mIoU':avg_cost[index, 7], 'val_pix_acc':avg_cost[index, 8],
                     'val_depth_loss':avg_cost[index, 9], 'val_abs_err':avg_cost[index, 10], 'val_rel_err':avg_cost[index, 11]})
-        
-        return total_loss
